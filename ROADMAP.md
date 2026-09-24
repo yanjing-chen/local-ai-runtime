@@ -1,44 +1,55 @@
-# Roadmap
+# Local AI Runtime Roadmap
 
-## Stage 0
-- Independent Local AI Runtime skeleton
+## Stage 0 — complete
+- Independent user-level service
 - OpenAI-compatible API
 - llama-server supervisor
 - systemd --user integration
 
-## Stage 1
-- Runtime manifest
-- one-click llama.cpp CPU/Vulkan installation
+## Stage 1 — current
+- Versioned llama.cpp runtime manager
+- CPU / Vulkan runtime packaging
+- resumable runtime downloads
 - SHA-256 verification
-- runtime update and rollback
+- required-file verification
+- current / previous runtime links
+- runtime upgrade
+- runtime rollback
+- GitHub Actions runtime build
 
 ## Stage 2
-- Model manifest and Model Manager
-- PaddleOCR-VL
-- HY-MT2-7B
-- automatic model switching
-- single-model residency
-- idle unloading
+- Publish verified runtime Release
+- fixed remote runtime manifest
+- one-click runtime installation API
+- runtime update checks
 
 ## Stage 3
-- Flameshot OCR client migration
-- Flameshot no longer owns llama-server
-- preserve v2.4 OCR behavior
+- Model Manager
+- PaddleOCR-VL
+- HY-MT2-7B
+- model manifest
+- single-model residency
+- automatic model switching
+- idle unloading
 
 ## Stage 4
-- GNOME translation extension integration
-- HY-MT2-7B through the shared runtime
-- 6800H memory validation
+- Flameshot OCR client migration
+- remove llama.cpp ownership from Flameshot
+- preserve v2.4 OCR behavior
 
 ## Stage 5
-- HunyuanOCR
-- per-model prompt
-- streaming
-- thinking
-- temperature
-- context size
+- GNOME extension integration
+- HY-MT2-7B shared backend
+- 6800H memory validation
 
 ## Stage 6
+- HunyuanOCR
+- per-model Prompt
+- Streaming
+- Thinking
+- Temperature
+- Context Size
+
+## Stage 7
 - CUDA Runtime Manager integration
 - CUDA 12.8-r2 multi-architecture
-- CPU / Vulkan / CUDA unified runtime management

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "latest": "llama-72797e891-r1",
+  "runtimes": [
+    {
+      "version": "llama-72797e891-r1",
+      "display_version": "llama.cpp 72797e891 r1",
+      "platform": "linux-x86_64",
+      "backend": "llama.cpp",
+      "llama_cpp_ref": "72797e891",
+      "archive": {
+        "name": "Local-AI-Runtime-llama-72797e891-r1-linux-x86_64.tar.gz",
+        "url": "RELEASE_URL_TO_BE_FILLED",
+        "size": 0,
+        "sha256": "TO_BE_FILLED",
+        "installed_size": 0
+      },
+      "required_files": [
+        {
+          "path": "bin/llama-server-cpu",
+          "size": 0
+        },
+        {
+          "path": "bin/llama-server-vulkan",
+          "size": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+name: Build llama.cpp Runtime
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "runtime-v*"
+
+permissions:
+  contents: read
+
+env:
+  LLAMA_CPP_REF: "72797e891"
+  RUNTIME_VERSION: "llama-72797e891-r1"
+
+jobs:
+  build-runtime:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Local AI Runtime
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            git \
+            libvulkan-dev \
+            glslc
+
+      - name: Checkout llama.cpp
+        run: |
+          git clone https://github.com/ggerganov/llama.cpp.git llama.cpp
+          cd llama.cpp
+          git checkout "${LLAMA_CPP_REF}"
+
+      - name: Build CPU runtime
+        run: |
+          cmake \
+            -S llama.cpp \
+            -B build-cpu \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGGML_NATIVE=OFF \
+            -DGGML_VULKAN=OFF \
+            -DLLAMA_CURL=OFF \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DLLAMA_BUILD_SERVER=ON \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_EXAMPLES=OFF
+
+          cmake --build build-cpu \
+            --target llama-server \
+            -j"$(nproc)"
+
+      - name: Build Vulkan runtime
+        run: |
+          cmake \
+            -S llama.cpp \
+            -B build-vulkan \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGGML_NATIVE=OFF \
+            -DGGML_VULKAN=ON \
+            -DLLAMA_CURL=OFF \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DLLAMA_BUILD_SERVER=ON \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_EXAMPLES=OFF
+
+          cmake --build build-vulkan \
+            --target llama-server \
+            -j"$(nproc)"
+
+      - name: Package runtime
+        run: |
+          set -eux
+
+          mkdir -p package/bin
+
+          CPU="$(find build-cpu -type f -name llama-server -perm -111 | head -n1)"
+          VK="$(find build-vulkan -type f -name llama-server -perm -111 | head -n1)"
+
+          test -n "$CPU"
+          test -n "$VK"
+
+          cp "$CPU" package/bin/llama-server-cpu
+          cp "$VK" package/bin/llama-server-vulkan
+
+          chmod 0755 package/bin/*
+
+          CPU_SIZE="$(stat -c %s package/bin/llama-server-cpu)"
+          VK_SIZE="$(stat -c %s package/bin/llama-server-vulkan)"
+          INSTALLED_SIZE="$((CPU_SIZE + VK_SIZE))"
+
+          ARCHIVE="Local-AI-Runtime-${RUNTIME_VERSION}-linux-x86_64.tar.gz"
+
+          tar -C package -czf "$ARCHIVE" .
+
+          ARCHIVE_SIZE="$(stat -c %s "$ARCHIVE")"
+          SHA256="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
+
+          cat > runtime-metadata.json <<EOF
+          {
+            "schema_version": 1,
+            "version": "${RUNTIME_VERSION}",
+            "platform": "linux-x86_64",
+            "backend": "llama.cpp",
+            "llama_cpp_ref": "${LLAMA_CPP_REF}",
+            "archive": {
+              "name": "${ARCHIVE}",
+              "size": ${ARCHIVE_SIZE},
+              "sha256": "${SHA256}",
+              "installed_size": ${INSTALLED_SIZE}
+            },
+            "required_files": [
+              {
+                "path": "bin/llama-server-cpu",
+                "size": ${CPU_SIZE}
+              },
+              {
+                "path": "bin/llama-server-vulkan",
+                "size": ${VK_SIZE}
+              }
+            ]
+          }
+          EOF
+
+          sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256sum"
+
+          echo "===== RUNTIME METADATA ====="
+          cat runtime-metadata.json
+
+      - name: Upload runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-ai-runtime-${{ env.RUNTIME_VERSION }}-linux-x86_64
+          retention-days: 3
+          path: |
+            Local-AI-Runtime-${{ env.RUNTIME_VERSION }}-linux-x86_64.tar.gz
+            Local-AI-Runtime-${{ env.RUNTIME_VERSION }}-linux-x86_64.tar.gz.sha256sum
+            runtime-metadata.json

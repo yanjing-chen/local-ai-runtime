@@ -19,11 +19,27 @@ install -m 0755 \
   "$ROOT/src/local_ai_runtime.py" \
   "$LIB_DIR/local_ai_runtime.py"
 
+install -m 0644 \
+  "$ROOT/src/runtime_manager.py" \
+  "$LIB_DIR/runtime_manager.py"
+
+install -m 0755 \
+  "$ROOT/src/runtimectl.py" \
+  "$LIB_DIR/runtimectl.py"
+
 cat > "$BIN_DIR/local-ai-runtime" <<EOF
 #!/usr/bin/env bash
 exec python3 "$LIB_DIR/local_ai_runtime.py" "\$@"
 EOF
-chmod 0755 "$BIN_DIR/local-ai-runtime"
+
+cat > "$BIN_DIR/local-ai-runtime-runtime" <<EOF
+#!/usr/bin/env bash
+PYTHONPATH="$LIB_DIR" exec python3 "$LIB_DIR/runtimectl.py" "\$@"
+EOF
+
+chmod 0755 \
+  "$BIN_DIR/local-ai-runtime" \
+  "$BIN_DIR/local-ai-runtime-runtime"
 
 if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
   install -m 0644 \
@@ -49,13 +65,10 @@ EOF
 systemctl --user daemon-reload
 
 echo
-echo "Installed Local AI Runtime user service."
+echo "Installed Local AI Runtime."
 echo
-echo "Configuration:"
-echo "  $CONFIG_DIR/config.json"
-echo
-echo "Service:"
-echo "  $SYSTEMD_DIR/local-ai-runtime.service"
+echo "Runtime manager:"
+echo "  $BIN_DIR/local-ai-runtime-runtime"
 echo
 echo "The service was NOT started automatically."
-echo "This prevents conflict with the current Flameshot v2.4 port 8111."
+echo "Flameshot v2.4 remains untouched."
