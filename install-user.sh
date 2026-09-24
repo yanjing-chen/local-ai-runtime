@@ -23,6 +23,10 @@ install -m 0644 \
   "$ROOT/src/runtime_manager.py" \
   "$LIB_DIR/runtime_manager.py"
 
+install -m 0644 \
+  "$ROOT/src/runtime_api.py" \
+  "$LIB_DIR/runtime_api.py"
+
 install -m 0755 \
   "$ROOT/src/runtimectl.py" \
   "$LIB_DIR/runtimectl.py"
@@ -67,8 +71,11 @@ systemctl --user daemon-reload
 echo
 echo "Installed Local AI Runtime."
 echo
-echo "Runtime manager:"
-echo "  $BIN_DIR/local-ai-runtime-runtime"
+echo "Configuration:"
+echo "  $CONFIG_DIR/config.json"
+echo
+echo "Service:"
+echo "  $SYSTEMD_DIR/local-ai-runtime.service"
 echo
 echo "The service was NOT started automatically."
 echo "Flameshot v2.4 remains untouched."

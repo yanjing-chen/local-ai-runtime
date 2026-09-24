@@ -6,34 +6,39 @@
 - llama-server supervisor
 - systemd --user integration
 
-## Stage 1 — current
+## Stage 1 — complete
 - Versioned llama.cpp runtime manager
 - CPU / Vulkan runtime packaging
-- resumable runtime downloads
 - SHA-256 verification
-- required-file verification
 - current / previous runtime links
-- runtime upgrade
-- runtime rollback
+- runtime upgrade and rollback
 - GitHub Actions runtime build
 
-## Stage 2
-- Publish verified runtime Release
+## Stage 2A — complete
+- Published verified CPU/Vulkan runtime
 - fixed remote runtime manifest
-- one-click runtime installation API
-- runtime update checks
+- live GitHub download verification
+- live install verification
+
+## Stage 2B — complete
+- runtime status API
+- asynchronous runtime installation API
+- update detection
+- rollback API
+- backend suitable for a graphical Install button
 
 ## Stage 3
 - Model Manager
+- model manifest
 - PaddleOCR-VL
 - HY-MT2-7B
-- model manifest
 - single-model residency
 - automatic model switching
 - idle unloading
 
 ## Stage 4
 - Flameshot OCR client migration
+- Local AI Runtime installation UI
 - remove llama.cpp ownership from Flameshot
 - preserve v2.4 OCR behavior
 
