@@ -1,17 +1,14 @@
 {
   "listen_host": "127.0.0.1",
   "listen_port": 8111,
-
   "backend_host": "127.0.0.1",
   "backend_port": 18180,
-
   "llama_server": "",
-
   "llama_runtime_root": "~/.local/share/local-ai-runtime/runtime/llama",
   "llama_runtime_manifest_url": "https://github.com/yanjing-chen/local-ai-runtime/releases/download/runtime-manifest/llama-runtimes.json",
-
   "startup_timeout_seconds": 120,
   "idle_unload_seconds": 600,
-
-  "models": []
+  "models": [],
+  "model_root": "~/.local/share/local-ai-runtime/models",
+  "model_manifest_url": ""
 }

@@ -20,6 +20,11 @@ from runtime_api import (
     RuntimeApiError,
 )
 
+from model_api import (
+    ModelController,
+    ModelApiError,
+)
+
 
 VERSION = "0.2.0"
 
@@ -119,6 +124,12 @@ class RuntimeManager:
 
             current_model = self.current_model
 
+            backend_pid = (
+                self.process.pid
+                if process_running
+                else None
+            )
+
         return {
             "runtime_version": VERSION,
             "configured_models": list(
@@ -126,6 +137,7 @@ class RuntimeManager:
             ),
             "current_model": current_model,
             "backend_running": process_running,
+            "backend_pid": backend_pid,
             "backend_healthy": (
                 self._backend_healthy()
                 if process_running
@@ -133,6 +145,18 @@ class RuntimeManager:
             ),
             "idle_unload_seconds": self.idle_timeout,
         }
+
+    def set_model_profile(
+        self,
+        model_id,
+        profile,
+    ):
+        with self.state_lock:
+            self.models[
+                model_id
+            ] = dict(
+                profile
+            )
 
     def stop_backend(self):
         with self.state_lock:
@@ -406,6 +430,13 @@ class ApiHandler(BaseHTTPRequestHandler):
             .llama_runtime_controller
         )
 
+    @property
+    def model_controller(self):
+        return (
+            self.server
+            .model_controller
+        )
+
     def send_json(
         self,
         status,
@@ -537,33 +568,23 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/v1/models":
-            data = []
-
-            for (
-                model_id,
-                model,
-            ) in self.manager.models.items():
-                data.append(
-                    {
-                        "id": model_id,
-                        "object": "model",
-                        "owned_by": model.get(
-                            "owned_by",
-                            "local-ai-runtime",
-                        ),
-                        "type": model.get(
-                            "type",
-                            "unknown",
-                        ),
-                    }
+            refresh = (
+                query.get(
+                    "refresh",
+                    ["0"],
+                )[0]
+                in (
+                    "1",
+                    "true",
+                    "yes",
                 )
+            )
 
             self.send_json(
                 200,
-                {
-                    "object": "list",
-                    "data": data,
-                },
+                self.model_controller.list_status(
+                    refresh=refresh
+                ),
             )
             return
 
@@ -585,6 +606,46 @@ class ApiHandler(BaseHTTPRequestHandler):
         path = parsed.path
 
         try:
+            if (
+                path
+                == "/v1/models/install"
+            ):
+                payload, _ = (
+                    self.read_json_body(
+                        allow_empty=False
+                    )
+                )
+
+                model_id = str(
+                    payload.get(
+                        "model",
+                        "",
+                    )
+                ).strip()
+
+                if not model_id:
+                    raise ModelApiError(
+                        "Model id is required.",
+                        400,
+                        "invalid_request_error",
+                    )
+
+                operation = (
+                    self.model_controller
+                    .start_install(
+                        model_id
+                    )
+                )
+
+                self.send_json(
+                    202,
+                    {
+                        "accepted": True,
+                        "operation": operation,
+                    },
+                )
+                return
+
             if (
                 path
                 == "/v1/runtime/llama/install"
@@ -670,15 +731,17 @@ class ApiHandler(BaseHTTPRequestHandler):
                     "invalid_request_error",
                 )
 
-            if (
-                model_id
-                not in self.manager.models
-            ):
-                raise RuntimeApiError(
-                    f"Unknown model: {model_id}",
-                    404,
-                    "model_not_found",
+            profile = (
+                self.model_controller
+                .runtime_profile(
+                    model_id
                 )
+            )
+
+            self.manager.set_model_profile(
+                model_id,
+                profile,
+            )
 
             with self.manager.request_lock:
                 self.manager.ensure_model(
@@ -766,6 +829,17 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self.manager.last_used = (
                     time.monotonic()
                 )
+
+        except ModelApiError as exc:
+            self.send_json(
+                exc.status_code,
+                {
+                    "error": {
+                        "message": str(exc),
+                        "type": exc.error_type,
+                    }
+                },
+            )
 
         except RuntimeApiError as exc:
             self.send_json(
@@ -886,6 +960,12 @@ def main():
         )
     )
 
+    model_controller = (
+        ModelController(
+            config
+        )
+    )
+
     server = ThreadingHTTPServer(
         (
             host,
@@ -897,6 +977,9 @@ def main():
     server.runtime_manager = manager
     server.llama_runtime_controller = (
         llama_runtime
+    )
+    server.model_controller = (
+        model_controller
     )
 
     def request_shutdown(
