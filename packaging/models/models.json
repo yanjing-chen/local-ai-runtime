@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "models": [
+    {
+      "id": "paddleocr-vl-1.6",
+      "display_name": "PaddleOCR-VL 1.6",
+      "version": "1.6",
+      "type": "ocr",
+      "source": {
+        "provider": "Hugging Face",
+        "repository": "PaddlePaddle/PaddleOCR-VL-1.6-GGUF",
+        "revision": "511b09642bb324401f15f97cc23bc67e8f0a291d"
+      },
+      "files": [
+        {
+          "name": "PaddleOCR-VL-1.6-GGUF.gguf",
+          "url": "https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/511b09642bb324401f15f97cc23bc67e8f0a291d/PaddleOCR-VL-1.6-GGUF.gguf?download=true",
+          "size": 935769056,
+          "sha256": "f3ae46ec885050acf4b3d31944431e1fd90d50664fb09126af4a3c050ba14ee8",
+          "role": "model"
+        },
+        {
+          "name": "PaddleOCR-VL-1.6-GGUF-mmproj.gguf",
+          "url": "https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/511b09642bb324401f15f97cc23bc67e8f0a291d/PaddleOCR-VL-1.6-GGUF-mmproj.gguf?download=true",
+          "size": 881770560,
+          "sha256": "204d757d7610d9b3faab10d506d69e5b244e32bf765e2bab2d0167e65e0a058a",
+          "role": "mmproj"
+        }
+      ],
+      "default_prompt": "OCR:",
+      "capabilities": {
+        "custom_prompt": true,
+        "streaming": true,
+        "thinking": false,
+        "temperature": true,
+        "context_size": true
+      },
+      "inference": {
+        "extra_args": [
+          "-c",
+          "8192"
+        ]
+      }
+    },
+    {
+      "id": "hy-mt2-7b",
+      "display_name": "Hy-MT2 7B Q4_K_M",
+      "version": "Q4_K_M",
+      "type": "translation",
+      "source": {
+        "provider": "Hugging Face",
+        "repository": "tencent/Hy-MT2-7B-GGUF",
+        "revision": "ab8472660ac61fac25f1af43fac2599d52a8a775"
+      },
+      "files": [
+        {
+          "name": "Hy-MT2-7B-Q4_K_M.gguf",
+          "url": "https://huggingface.co/tencent/Hy-MT2-7B-GGUF/resolve/ab8472660ac61fac25f1af43fac2599d52a8a775/Hy-MT2-7B-Q4_K_M.gguf?download=true",
+          "size": 4624648896,
+          "sha256": "9f96256500f3fc1ab4d64336b58f52a949a95ad7516b0c229476eef782f9f77b",
+          "role": "model"
+        }
+      ],
+      "default_prompt": "",
+      "capabilities": {
+        "custom_prompt": true,
+        "streaming": true,
+        "thinking": false,
+        "temperature": true,
+        "context_size": true
+      },
+      "inference": {
+        "extra_args": [
+          "-c",
+          "8192"
+        ]
+      }
+    }
+  ]
+}
