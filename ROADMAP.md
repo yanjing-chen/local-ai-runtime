@@ -27,14 +27,27 @@
 - rollback API
 - backend suitable for a graphical Install button
 
-## Stage 3
-- Model Manager
-- model manifest
-- PaddleOCR-VL
-- HY-MT2-7B
-- single-model residency
+## Stage 3A — complete
+- Model Manager foundation
+- model manifest support
+- model installation and SHA-256 verification
 - automatic model switching
-- idle unloading
+- single-model residency
+- same-model process reuse
+
+## Stage 3B — complete
+- official PaddleOCR-VL-1.6 catalog entry
+- official Tencent Hy-MT2-7B Q4_K_M catalog entry
+- immutable Hugging Face revision pinning
+- verified upstream file sizes and SHA-256 metadata
+- public models manifest
+
+## Stage 3C
+- real PaddleOCR-VL installation
+- real Hy-MT2-7B installation
+- Vulkan inference
+- OCR -> translation model switching
+- RAM / VRAM validation
 
 ## Stage 4
 - Flameshot OCR client migration
