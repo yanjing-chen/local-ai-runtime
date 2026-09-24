@@ -30,7 +30,8 @@ jobs:
             ninja-build \
             git \
             libvulkan-dev \
-            glslc
+            glslc \
+            spirv-headers
 
       - name: Checkout llama.cpp
         run: |
