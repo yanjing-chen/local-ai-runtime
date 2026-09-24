@@ -42,7 +42,9 @@ MODELS = [
         "inference": {
             "extra_args": [
                 "-c",
-                "8192",
+                "4096",
+                "-ngl",
+                "99",
             ]
         },
     },
@@ -69,7 +71,9 @@ MODELS = [
         "inference": {
             "extra_args": [
                 "-c",
-                "8192",
+                "4096",
+                "-ngl",
+                "99",
             ]
         },
     },

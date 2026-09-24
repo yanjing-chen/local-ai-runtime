@@ -49,6 +49,13 @@
 - OCR -> translation model switching
 - RAM / VRAM validation
 
+## Stage 3D — complete
+- production user-level Local AI Runtime bundle
+- automatic managed Vulkan runtime discovery
+- CPU fallback
+- systemd --user install/start support
+- fixed application manifest for GUI installers
+
 ## Stage 4
 - Flameshot OCR client migration
 - Local AI Runtime installation UI

@@ -26,7 +26,7 @@ from model_api import (
 )
 
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 
 def expand_path(value):
@@ -54,6 +54,21 @@ class RuntimeManager:
                 "",
             )
         )
+
+        self.llama_runtime_root = expand_path(
+            config.get(
+                "llama_runtime_root",
+                str(
+                    Path.home()
+                    / ".local"
+                    / "share"
+                    / "local-ai-runtime"
+                    / "runtime"
+                    / "llama"
+                ),
+            )
+        )
+
         self.startup_timeout = int(
             config.get(
                 "startup_timeout_seconds",
@@ -181,6 +196,79 @@ class RuntimeManager:
                     timeout=5
                 )
 
+    def _auto_runtime_server(self):
+        """Resolve the best installed llama-server at request time.
+
+        An explicit llama_server configuration always wins. Otherwise
+        Local AI Runtime prefers the managed Vulkan binary when it can
+        actually enumerate a Vulkan device, and falls back to CPU.
+        """
+
+        runtime_bin = (
+            Path(self.llama_runtime_root)
+            / "current"
+            / "bin"
+        )
+
+        vulkan = (
+            runtime_bin
+            / "llama-server-vulkan"
+        )
+
+        cpu = (
+            runtime_bin
+            / "llama-server-cpu"
+        )
+
+        if (
+            vulkan.is_file()
+            and os.access(
+                vulkan,
+                os.X_OK,
+            )
+        ):
+            try:
+                result = subprocess.run(
+                    [
+                        str(vulkan),
+                        "--list-devices",
+                    ],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    timeout=15,
+                    check=False,
+                )
+
+                output = (
+                    result.stdout
+                    or ""
+                )
+
+                if (
+                    result.returncode == 0
+                    and "vulkan" in output.lower()
+                ):
+                    return str(
+                        vulkan
+                    )
+
+            except Exception:
+                pass
+
+        if (
+            cpu.is_file()
+            and os.access(
+                cpu,
+                os.X_OK,
+            )
+        ):
+            return str(
+                cpu
+            )
+
+        return ""
+
     def _model_command(self, model):
         runtime = expand_path(
             model.get(
@@ -193,8 +281,12 @@ class RuntimeManager:
             runtime = self.default_llama_server
 
         if not runtime:
+            runtime = self._auto_runtime_server()
+
+        if not runtime:
             raise RuntimeError(
-                "No llama-server executable is configured."
+                "No llama-server executable is available. "
+                "Install the Local AI Runtime CPU/Vulkan runtime first."
             )
 
         runtime_path = Path(runtime)

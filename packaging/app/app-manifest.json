@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "latest": "0.3.0",
+  "packages": [
+    {
+      "version": "0.3.0",
+      "platform": "linux-x86_64",
+      "archive": {
+        "name": "Local-AI-Runtime-0.3.0-linux-x86_64.tar.gz",
+        "size": 14029,
+        "sha256": "39e1d3d075784638d38fb00d3f97e73b86d5b8e5bad29b647582063ae2dc4c84",
+        "url": "https://github.com/yanjing-chen/local-ai-runtime/releases/download/local-ai-runtime-v0.3.0/Local-AI-Runtime-0.3.0-linux-x86_64.tar.gz"
+      },
+      "installer": {
+        "path": "install-user.sh",
+        "arguments": [
+          "--start"
+        ],
+        "requires_root": false
+      }
+    }
+  ]
+}
