@@ -26,7 +26,7 @@ from model_api import (
 )
 
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 
 
 def expand_path(value):
