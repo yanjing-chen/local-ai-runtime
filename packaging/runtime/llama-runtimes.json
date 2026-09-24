@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "latest": "llama-72797e891-r1",
+  "runtimes": [
+    {
+      "version": "llama-72797e891-r1",
+      "display_version": "llama.cpp 72797e891 r1 (CPU/Vulkan)",
+      "platform": "linux-x86_64",
+      "backend": "llama.cpp",
+      "llama_cpp_ref": "72797e891",
+      "archive": {
+        "name": "Local-AI-Runtime-llama-72797e891-r1-linux-x86_64.tar.gz",
+        "size": 28061632,
+        "sha256": "a6ec08adc28611488b447d0c9ad2ca0a52bb49345d3168fc8ee0793dc3831d5e",
+        "installed_size": 70003208,
+        "url": "https://github.com/yanjing-chen/local-ai-runtime/releases/download/llama-runtime-72797e891-r1/Local-AI-Runtime-llama-72797e891-r1-linux-x86_64.tar.gz"
+      },
+      "required_files": [
+        {
+          "path": "bin/llama-server-cpu",
+          "size": 18054400
+        },
+        {
+          "path": "bin/llama-server-vulkan",
+          "size": 51948808
+        }
+      ]
+    }
+  ]
+}
