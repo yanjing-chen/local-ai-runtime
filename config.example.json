@@ -10,8 +10,6 @@
   "idle_unload_seconds": 600,
   "models": [],
   "model_root": "~/.local/share/local-ai-runtime/models",
-  "model_install_log_root": "~/.local/share/local-ai-runtime/logs/model-install",
-  "hunyuanocr_converter_root": "~/.local/share/local-ai-runtime/tools/hunyuanocr-converter/828fdf282",
   "custom_model_registry": "~/.config/local-ai-runtime/custom-models.json",
   "model_manifest_url": "https://github.com/yanjing-chen/local-ai-runtime/releases/download/models-manifest/models.json"
 }

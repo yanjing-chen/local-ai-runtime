@@ -25,7 +25,7 @@
           "size": 52190576
         }
       ],
-      "display_version": "llama.cpp b11103 / 828fdf282 r1 (CPU/Vulkan, HunyuanOCR 1.5 ready)"
+      "display_version": "llama.cpp b11103 / 828fdf282 r1 (CPU/Vulkan)"
     }
   ]
 }

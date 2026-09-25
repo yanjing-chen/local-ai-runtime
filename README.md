@@ -19,7 +19,6 @@ The client explicitly selects a model using the OpenAI `model` field.
 Examples:
 
     paddleocr-vl-1.6
-    hunyuanocr-1.5
     hy-mt2-7b
 
 Only one large model is intended to remain resident at a time.
@@ -67,32 +66,20 @@ Updating or removing the active custom model unloads its llama-server process.
 The next request starts the selected model with the new settings, preserving
 the single-model residency guarantee.
 
-## HunyuanOCR 1.5 local conversion
+## Supported catalog models
 
-Local AI Runtime 0.5 adds an official-source installation recipe for
-`hunyuanocr-1.5`. The installer downloads the Tencent checkpoint from its
-pinned Hugging Face revision, verifies every file, and converts the base model
-and multimodal projector to F16 GGUF with the pinned llama.cpp b11103
-converter. It does not download the DFlash draft model and never publishes or
-redistributes Tencent model weights.
+The supported public catalog intentionally stays small:
 
-Installation requires explicit acceptance of the Tencent Hunyuan Community
-License Agreement:
+- PaddleOCR-VL 1.6 for OCR and vision
+- Hy-MT2 7B Q4_K_M for translation and chat
 
-    POST /v1/models/install
-    {"model":"hunyuanocr-1.5","accept_license":true}
-
-Conversion uses an isolated Python virtual environment under the Runtime data
-directory. Ubuntu must provide the `python3-venv` package. Source checkpoints
-are retained after an interrupted download so the transfer can resume, then
-removed after a verified conversion. The generated GGUF files and a copy of
-the license remain in the model directory. Conversion logs are stored under:
-
-    ~/.local/share/local-ai-runtime/logs/model-install
+Other compatible local models can be registered through the custom GGUF API.
+Local AI Runtime never copies or removes the external files used by a custom
+model entry.
 
 ## Current status
 
-Stage 0 implements:
+The current Runtime implements:
 
 - user-level HTTP service
 - `/health`
@@ -105,6 +92,10 @@ Stage 0 implements:
 - idle model unloading
 - systemd user-service installer
 - automated smoke tests
+- managed CPU / Vulkan llama.cpp runtime updates and rollback
+- verified model installation
+- persistent custom GGUF registration
+- real-time SSE streaming
 
 Model and llama.cpp runtime installation remain separate from client
 applications. Removing Flameshot OCR does not remove this shared Runtime.

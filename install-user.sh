@@ -60,12 +60,21 @@ install -m 0644 \
     "$LIB_DIR/model_api.py"
 
 install -m 0644 \
-    "$ROOT/src/hunyuanocr_installer.py" \
-    "$LIB_DIR/hunyuanocr_installer.py"
-
-install -m 0644 \
     "$ROOT/src/custom_model_api.py" \
     "$LIB_DIR/custom_model_api.py"
+
+# Runtime 0.5.0 briefly shipped an experimental HunyuanOCR converter.
+# Remove only that obsolete module during an upgrade. Model files and the
+# shared llama.cpp runtime are deliberately left untouched.
+rm -f "$LIB_DIR/hunyuanocr_installer.py"
+
+if [[ -d "$LIB_DIR/__pycache__" ]]; then
+    find "$LIB_DIR/__pycache__" \
+        -maxdepth 1 \
+        -type f \
+        -name 'hunyuanocr_installer*.pyc' \
+        -delete
+fi
 
 install -m 0755 \
     "$ROOT/src/runtimectl.py" \

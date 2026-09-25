@@ -13,16 +13,17 @@ case "${1:-}" in
       "$ROOT/src/runtime_manager.py" \
       "$ROOT/src/runtime_api.py" \
       "$ROOT/src/model_api.py" \
-      "$ROOT/src/hunyuanocr_installer.py" \
       "$ROOT/src/custom_model_api.py" \
       "$ROOT/src/runtimectl.py" \
       "$ROOT/tests/fake_llama_server.py" \
+      "$ROOT/tests/catalog_scope_test.py" \
       "$ROOT/tests/custom_model_test.py" \
-      "$ROOT/tests/streaming_proxy_test.py" \
-      "$ROOT/tests/fake_hunyuanocr_converter.py" \
-      "$ROOT/tests/hunyuanocr_recipe_test.py"
+      "$ROOT/tests/streaming_proxy_test.py"
 
     echo "PYTHON SYNTAX        PASS"
+
+    "$PY" \
+      "$ROOT/tests/catalog_scope_test.py"
 
     TMP="$ROOT/.runtime-test"
 
@@ -105,12 +106,6 @@ CHECK
     PYTHONPATH="$ROOT/src" \
       "$PY" \
       "$ROOT/tests/runtime_manager_test.py"
-
-    echo "===== STAGE 6D HUNYUANOCR RECIPE TEST ====="
-
-    PYTHONPATH="$ROOT/src" \
-      "$PY" \
-      "$ROOT/tests/hunyuanocr_recipe_test.py"
 
     echo "===== STAGE 3A MODEL SWITCH TEST ====="
 
@@ -217,7 +212,6 @@ CHECK
     echo "SINGLE RESIDENCY      PASS"
     echo "STREAMING PROXY       PASS"
     echo "CUSTOM MODEL API      PASS"
-    echo "HUNYUANOCR INSTALLER  PASS"
     echo "LOCAL AI RUNTIME STAGE 3A: PASS"
     ;;
 

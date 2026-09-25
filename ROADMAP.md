@@ -77,30 +77,18 @@
 - external model files are never removed
 - Flameshot model-management UI
 
-## Stage 6D-1 / 6D-2 — complete
-- llama.cpp b11103 CPU/Vulkan runtime
-- HunyuanOCR flags
-- runtime update and rollback
-- PaddleOCR and HY-MT2 regressions on Ryzen 7 6800H
+## Stage 6D — closed
+- llama.cpp b11103 CPU/Vulkan runtime retained
+- PaddleOCR and Hy-MT2 regressions passed on Ryzen 7 6800H
+- experimental HunyuanOCR source converter withdrawn in Runtime 0.5.1
+- no HunyuanOCR model entry, converter or Python dependency payload
 
-## Stage 6D-3 — Runtime installer complete
-- official Tencent HunyuanOCR 1.5 source checkpoint
-- immutable revision and SHA-256 pinning
-- explicit Tencent license acceptance
-- resumable source downloads
-- isolated local F16 GGUF and MMProj conversion
-- pinned upstream llama.cpp b11103 converter
-- no redistribution of Tencent model weights
-- DFlash deliberately deferred to preserve one-model residency
-
-## Stage 6D remaining
-- HunyuanOCR 1.5 real conversion and OCR validation on Ryzen 7 6800H
-- Flameshot HunyuanOCR selection and license UI
-- per-model Prompt
-- Streaming
-- Thinking
-- Temperature
-- Context Size
+## Stage 6E
+- automatic GGUF metadata inspection
+- suggested model ID, name, type, context size and capabilities
+- automatic MMProj discovery and compatibility hints
+- manual override for every suggested value
+- external model files remain user-owned
 
 ## Stage 7
 - CUDA Runtime Manager integration

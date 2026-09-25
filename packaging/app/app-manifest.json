@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
-  "latest": "0.5.0",
+  "latest": "0.5.1",
   "packages": [
     {
-      "version": "0.5.0",
+      "version": "0.5.1",
       "platform": "linux-x86_64",
       "archive": {
-        "name": "Local-AI-Runtime-0.5.0-linux-x86_64.tar.gz",
-        "size": 22508,
-        "sha256": "e80c199f3eb9183cab9828c3fd12352f460575fd6b86e6ef408962054a9de4f3",
-        "url": "https://github.com/yanjing-chen/local-ai-runtime/releases/download/local-ai-runtime-v0.5.0/Local-AI-Runtime-0.5.0-linux-x86_64.tar.gz"
+        "name": "Local-AI-Runtime-0.5.1-linux-x86_64.tar.gz",
+        "size": 18408,
+        "sha256": "ce7dd4309cf17f67f8af909e3f957d154ea4558917ab9e4ccc8c7dc2f567d75e",
+        "url": "https://github.com/yanjing-chen/local-ai-runtime/releases/download/local-ai-runtime-v0.5.1/Local-AI-Runtime-0.5.1-linux-x86_64.tar.gz"
       },
       "installer": {
         "path": "install-user.sh",

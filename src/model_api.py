@@ -16,9 +16,6 @@ from custom_model_api import (
     CustomModelError,
     CustomModelStore,
 )
-from hunyuanocr_installer import (
-    HunyuanOcrInstaller,
-)
 
 
 class ModelApiError(RuntimeError):
@@ -54,7 +51,6 @@ def sha256_file(path):
 
 class ModelController:
     def __init__(self, config):
-        self.config = dict(config)
         self.root = expand(
             config.get(
                 "model_root",
@@ -80,18 +76,6 @@ class ModelController:
         )
 
         self.downloads.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        self.logs = expand(
-            config.get(
-                "model_install_log_root",
-                "~/.local/share/local-ai-runtime/logs/model-install",
-            )
-        )
-
-        self.logs.mkdir(
             parents=True,
             exist_ok=True,
         )
@@ -323,17 +307,6 @@ class ModelController:
                 ):
                     return False
 
-                minimum_size = item.get(
-                    "min_size"
-                )
-
-                if (
-                    minimum_size is not None
-                    and target.stat().st_size
-                    < int(minimum_size)
-                ):
-                    return False
-
             return bool(
                 model.get(
                     "files",
@@ -431,76 +404,9 @@ class ModelController:
             destination,
         )
 
-    def _update_operation(self, model_id, **updates):
-        with self.lock:
-            operation = self.operations.get(model_id)
-
-            if operation is not None:
-                operation.update(updates)
-
-    def _install_recipe(
-        self,
-        model,
-        staging,
-        job_id,
-    ):
-        recipe = model.get("install", {})
-        method = recipe.get("method", "direct")
-
-        if method != "hunyuanocr_hf_to_gguf":
-            raise ModelApiError(
-                f"Unsupported model install method: {method}"
-            )
-
-        cache = (
-            self.downloads
-            / model["id"]
-            / str(model.get("version", "default"))
-        )
-        log_path = self.logs / f"{job_id}.log"
-
-        self._update_operation(
-            model["id"],
-            log_path=str(log_path),
-        )
-
-        installer = HunyuanOcrInstaller(
-            self.config,
-            self._download,
-            lambda phase, **extra: self._update_operation(
-                model["id"],
-                phase=phase,
-                **extra,
-            ),
-        )
-
-        generated = installer.install(
-            model,
-            cache,
-            staging,
-            log_path,
-        )
-
-        shutil.rmtree(
-            cache,
-            ignore_errors=True,
-        )
-
-        try:
-            cache.parent.rmdir()
-        except OSError:
-            pass
-
-        return {
-            "generated_files": generated,
-            "conversion_log": str(log_path),
-        }
-
     def install(
         self,
         model_id,
-        accept_license=False,
-        job_id=None,
     ):
         model = self._model_entry(
             model_id
@@ -523,18 +429,6 @@ class ModelController:
                 f"Model has no files: {model_id}"
             )
 
-        license_data = model.get("license", {})
-
-        if (
-            license_data.get("requires_acceptance")
-            and not accept_license
-        ):
-            raise ModelApiError(
-                "This model requires explicit license acceptance before installation.",
-                409,
-                "license_acceptance_required",
-            )
-
         final = self._model_directory(
             model
         )
@@ -549,80 +443,56 @@ class ModelController:
         )
 
         try:
-            method = model.get(
-                "install",
-                {},
-            ).get(
-                "method",
-                "direct",
-            )
-            recipe_metadata = {}
-
-            if method == "direct":
-                for index, item in enumerate(files, start=1):
-                    name = item.get(
-                        "name"
-                    )
-
-                    url = item.get(
-                        "url"
-                    )
-
-                    expected_sha = str(
-                        item.get(
-                            "sha256",
-                            "",
-                        )
-                    ).lower()
-
-                    if (
-                        not name
-                        or not url
-                        or not expected_sha
-                    ):
-                        raise ModelApiError(
-                            "Incomplete model file metadata."
-                        )
-
-                    self._update_operation(
-                        model_id,
-                        phase="downloading",
-                        current_file=name,
-                        file_index=index,
-                        file_count=len(files),
-                    )
-
-                    target = self._file_target(
-                        staging,
-                        item,
-                    )
-
-                    self._download(
-                        url,
-                        target,
-                        item.get(
-                            "size"
-                        ),
-                    )
-
-                    actual_sha = sha256_file(
-                        target
-                    )
-
-                    if (
-                        actual_sha.lower()
-                        != expected_sha
-                    ):
-                        raise ModelApiError(
-                            "Model SHA256 mismatch "
-                            f"for {name}"
-                        )
-            else:
-                recipe_metadata = self._install_recipe(
-                    model,
-                    staging,
-                    job_id or str(uuid.uuid4()),
+            for item in files:
+                name = item.get(
+                    "name"
                 )
+
+                url = item.get(
+                    "url"
+                )
+
+                expected_sha = str(
+                    item.get(
+                        "sha256",
+                        "",
+                    )
+                ).lower()
+
+                if (
+                    not name
+                    or not url
+                    or not expected_sha
+                ):
+                    raise ModelApiError(
+                        "Incomplete model file metadata."
+                    )
+
+                target = self._file_target(
+                    staging,
+                    item,
+                )
+
+                self._download(
+                    url,
+                    target,
+                    item.get(
+                        "size"
+                    ),
+                )
+
+                actual_sha = sha256_file(
+                    target
+                )
+
+                if (
+                    actual_sha.lower()
+                    != expected_sha
+                ):
+                    raise ModelApiError(
+                        "Model SHA256 mismatch "
+                        f"for {name}"
+                    )
 
             metadata = {
                 "id": model["id"],
@@ -630,13 +500,7 @@ class ModelController:
                     "version"
                 ),
                 "installed_at": time.time(),
-                "install_method": method,
-                "license_accepted": bool(
-                    license_data.get("requires_acceptance")
-                ),
-                "license": license_data,
             }
-            metadata.update(recipe_metadata)
 
             (
                 staging
@@ -732,24 +596,16 @@ class ModelController:
             ):
                 return default
 
-        with self.lock:
-            operation = dict(
-                self.operations.get(
-                    model["id"],
-                    {
-                        "state": "idle",
-                        "action": None,
-                        "job_id": None,
-                        "error": None,
-                        "phase": None,
-                        "current_file": None,
-                        "log_path": None,
-                    },
-                )
+        operation = (
+            self.operations.get(
+                model["id"],
+                {
+                    "state": "idle",
+                    "action": None,
+                    "job_id": None,
+                    "error": None,
+                },
             )
-
-        installed = self.is_installed(
-            model
         )
 
         status = {
@@ -765,7 +621,9 @@ class ModelController:
                 "type",
                 "unknown",
             ),
-            "installed": installed,
+            "installed": self.is_installed(
+                model
+            ),
             "capabilities": model.get(
                 "capabilities",
                 {},
@@ -796,26 +654,8 @@ class ModelController:
                 "default_prompt",
                 "",
             ),
-            "operation": operation,
-            "install_method": model.get(
-                "install",
-                {},
-            ).get(
-                "method",
-                "direct",
-            ),
-            "license": model.get(
-                "license"
-            ),
-            "download_size": sum(
-                int(item.get("size", 0))
-                for item in model.get(
-                    "install",
-                    {},
-                ).get(
-                    "source_files",
-                    model.get("files", []),
-                )
+            "operation": dict(
+                operation
             ),
         }
 
@@ -974,7 +814,6 @@ class ModelController:
     def start_install(
         self,
         model_id,
-        accept_license=False,
     ):
         model = self._model_entry(
             model_id
@@ -985,18 +824,6 @@ class ModelController:
                 "Custom models use external files and do not need installation.",
                 409,
                 "custom_model_external",
-            )
-
-        license_data = model.get("license", {})
-
-        if (
-            license_data.get("requires_acceptance")
-            and not accept_license
-        ):
-            raise ModelApiError(
-                "This model requires explicit license acceptance before installation.",
-                409,
-                "license_acceptance_required",
             )
 
         with self.lock:
@@ -1024,11 +851,6 @@ class ModelController:
                 "action": "install",
                 "job_id": job_id,
                 "error": None,
-                "phase": "queued",
-                "current_file": None,
-                "file_index": None,
-                "file_count": None,
-                "log_path": None,
                 "started_at": time.time(),
                 "finished_at": None,
             }
@@ -1037,8 +859,6 @@ class ModelController:
             target=self._install_worker,
             args=(
                 model_id,
-                bool(accept_license),
-                job_id,
             ),
             name=(
                 "model-install-"
@@ -1058,14 +878,10 @@ class ModelController:
     def _install_worker(
         self,
         model_id,
-        accept_license,
-        job_id,
     ):
         try:
             self.install(
-                model_id,
-                accept_license=accept_license,
-                job_id=job_id,
+                model_id
             )
 
             with self.lock:
@@ -1075,8 +891,6 @@ class ModelController:
                     {
                         "state": "success",
                         "error": None,
-                        "phase": "complete",
-                        "current_file": None,
                         "finished_at":
                         time.time(),
                     }
@@ -1090,7 +904,6 @@ class ModelController:
                     {
                         "state": "error",
                         "error": str(exc),
-                        "phase": "error",
                         "finished_at":
                         time.time(),
                     }
