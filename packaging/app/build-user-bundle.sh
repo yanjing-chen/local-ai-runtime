@@ -36,6 +36,7 @@ cp -a \
     "$ROOT/src/runtime_manager.py" \
     "$ROOT/src/runtime_api.py" \
     "$ROOT/src/model_api.py" \
+    "$ROOT/src/hunyuanocr_installer.py" \
     "$ROOT/src/custom_model_api.py" \
     "$ROOT/src/runtimectl.py" \
     "$STAGING/$NAME/src/"

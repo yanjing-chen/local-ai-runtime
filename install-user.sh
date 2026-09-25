@@ -60,6 +60,10 @@ install -m 0644 \
     "$LIB_DIR/model_api.py"
 
 install -m 0644 \
+    "$ROOT/src/hunyuanocr_installer.py" \
+    "$LIB_DIR/hunyuanocr_installer.py"
+
+install -m 0644 \
     "$ROOT/src/custom_model_api.py" \
     "$LIB_DIR/custom_model_api.py"
 

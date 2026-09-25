@@ -42,7 +42,7 @@
 - verified upstream file sizes and SHA-256 metadata
 - public models manifest
 
-## Stage 3C
+## Stage 3C — complete
 - real PaddleOCR-VL installation
 - real Hy-MT2-7B installation
 - Vulkan inference
@@ -56,29 +56,46 @@
 - systemd --user install/start support
 - fixed application manifest for GUI installers
 
-## Stage 4
+## Stage 4 — complete
 - Flameshot OCR client migration
 - Local AI Runtime installation UI
 - remove llama.cpp ownership from Flameshot
 - preserve v2.4 OCR behavior
 
-## Stage 5
+## Stage 5 — complete
 - GNOME extension integration
 - HY-MT2-7B shared backend
 - 6800H memory validation
 - SSE streaming proxy regression test
 
-## Stage 6C — Runtime foundation complete
+## Stage 6C — complete
 - persistent custom GGUF model registry
 - optional MMProj path
 - context size and GPU layer settings
 - capability declarations
 - safe active-model unload on update or removal
 - external model files are never removed
-- Flameshot model-management UI remains the next Stage 6C step
+- Flameshot model-management UI
 
-## Stage 6
-- HunyuanOCR
+## Stage 6D-1 / 6D-2 — complete
+- llama.cpp b11103 CPU/Vulkan runtime
+- HunyuanOCR flags
+- runtime update and rollback
+- PaddleOCR and HY-MT2 regressions on Ryzen 7 6800H
+
+## Stage 6D-3 — Runtime installer complete
+- official Tencent HunyuanOCR 1.5 source checkpoint
+- immutable revision and SHA-256 pinning
+- explicit Tencent license acceptance
+- resumable source downloads
+- isolated local F16 GGUF and MMProj conversion
+- pinned upstream llama.cpp b11103 converter
+- no redistribution of Tencent model weights
+- DFlash deliberately deferred to preserve one-model residency
+
+## Stage 6D remaining
+- HunyuanOCR 1.5 real conversion and OCR validation on Ryzen 7 6800H
+- Flameshot HunyuanOCR selection and license UI
 - per-model Prompt
 - Streaming
 - Thinking

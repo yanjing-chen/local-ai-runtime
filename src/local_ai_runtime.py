@@ -26,7 +26,7 @@ from model_api import (
 )
 
 
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 
 
 def expand_path(value):
@@ -826,7 +826,14 @@ class ApiHandler(BaseHTTPRequestHandler):
                 operation = (
                     self.model_controller
                     .start_install(
-                        model_id
+                        model_id,
+                        accept_license=(
+                            payload.get(
+                                "accept_license",
+                                False,
+                            )
+                            is True
+                        ),
                     )
                 )
 

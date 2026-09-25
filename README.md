@@ -19,7 +19,7 @@ The client explicitly selects a model using the OpenAI `model` field.
 Examples:
 
     paddleocr-vl-1.6
-    hunyuan-ocr
+    hunyuanocr-1.5
     hy-mt2-7b
 
 Only one large model is intended to remain resident at a time.
@@ -67,6 +67,29 @@ Updating or removing the active custom model unloads its llama-server process.
 The next request starts the selected model with the new settings, preserving
 the single-model residency guarantee.
 
+## HunyuanOCR 1.5 local conversion
+
+Local AI Runtime 0.5 adds an official-source installation recipe for
+`hunyuanocr-1.5`. The installer downloads the Tencent checkpoint from its
+pinned Hugging Face revision, verifies every file, and converts the base model
+and multimodal projector to F16 GGUF with the pinned llama.cpp b11103
+converter. It does not download the DFlash draft model and never publishes or
+redistributes Tencent model weights.
+
+Installation requires explicit acceptance of the Tencent Hunyuan Community
+License Agreement:
+
+    POST /v1/models/install
+    {"model":"hunyuanocr-1.5","accept_license":true}
+
+Conversion uses an isolated Python virtual environment under the Runtime data
+directory. Ubuntu must provide the `python3-venv` package. Source checkpoints
+are retained after an interrupted download so the transfer can resume, then
+removed after a verified conversion. The generated GGUF files and a copy of
+the license remain in the model directory. Conversion logs are stored under:
+
+    ~/.local/share/local-ai-runtime/logs/model-install
+
 ## Current status
 
 Stage 0 implements:
@@ -83,9 +106,8 @@ Stage 0 implements:
 - systemd user-service installer
 - automated smoke tests
 
-No model or llama.cpp runtime is installed by Stage 0 yet.
-
-The current Flameshot OCR v2.4 installation is not modified.
+Model and llama.cpp runtime installation remain separate from client
+applications. Removing Flameshot OCR does not remove this shared Runtime.
 
 ## Development
 
