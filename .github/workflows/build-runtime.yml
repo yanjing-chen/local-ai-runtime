@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 env:
-  LLAMA_CPP_REF: "72797e891"
-  RUNTIME_VERSION: "llama-72797e891-r1"
+  LLAMA_CPP_REF: "828fdf282e195300c2965bd9511807e24ed53bdb"
+  RUNTIME_VERSION: "llama-828fdf282-r1"
 
 jobs:
   build-runtime:
@@ -76,6 +76,27 @@ jobs:
           cmake --build build-vulkan \
             --target llama-server \
             -j"$(nproc)"
+
+      - name: Verify HunyuanOCR-compatible llama.cpp
+        run: |
+          set -eux
+
+          CPU="$(find build-cpu -type f -name llama-server -perm -111 | head -n1)"
+          VK="$(find build-vulkan -type f -name llama-server -perm -111 | head -n1)"
+
+          test -n "$CPU"
+          test -n "$VK"
+
+          "$CPU" --version
+          "$VK" --version
+          "$CPU" --help > cpu-help.txt
+          "$VK" --help > vulkan-help.txt
+
+          grep -Fq -- "--spec-type" cpu-help.txt
+          grep -Fq -- "draft-dflash" cpu-help.txt
+          grep -Fq -- "--jinja" cpu-help.txt
+          grep -Fq -- "--mmproj" cpu-help.txt
+          grep -Fq -- "draft-dflash" vulkan-help.txt
 
       - name: Package runtime
         run: |
