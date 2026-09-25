@@ -14,10 +14,12 @@ case "${1:-}" in
       "$ROOT/src/runtime_api.py" \
       "$ROOT/src/model_api.py" \
       "$ROOT/src/custom_model_api.py" \
+      "$ROOT/src/gguf_inspector.py" \
       "$ROOT/src/runtimectl.py" \
       "$ROOT/tests/fake_llama_server.py" \
       "$ROOT/tests/catalog_scope_test.py" \
       "$ROOT/tests/custom_model_test.py" \
+      "$ROOT/tests/gguf_inspector_test.py" \
       "$ROOT/tests/streaming_proxy_test.py"
 
     echo "PYTHON SYNTAX        PASS"
@@ -199,6 +201,13 @@ CHECK
       "$MODEL_FIXTURE/custom-files" \
       "$TMP/custom-models.json"
 
+    echo "===== STAGE 6E GGUF INSPECTION TEST ====="
+
+    "$PY" \
+      "$ROOT/tests/gguf_inspector_test.py" \
+      "http://127.0.0.1:18121" \
+      "$MODEL_FIXTURE/gguf-inspection"
+
     cleanup_models
     trap - EXIT
 
@@ -212,6 +221,7 @@ CHECK
     echo "SINGLE RESIDENCY      PASS"
     echo "STREAMING PROXY       PASS"
     echo "CUSTOM MODEL API      PASS"
+    echo "GGUF INSPECTION API   PASS"
     echo "LOCAL AI RUNTIME STAGE 3A: PASS"
     ;;
 

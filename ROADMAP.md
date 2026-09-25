@@ -83,12 +83,13 @@
 - experimental HunyuanOCR source converter withdrawn in Runtime 0.5.1
 - no HunyuanOCR model entry, converter or Python dependency payload
 
-## Stage 6E
+## Stage 6E — Runtime complete
 - automatic GGUF metadata inspection
 - suggested model ID, name, type, context size and capabilities
 - automatic MMProj discovery and compatibility hints
 - manual override for every suggested value
 - external model files remain user-owned
+- Flameshot guided import UI remains the client-side follow-up
 
 ## Stage 7
 - CUDA Runtime Manager integration

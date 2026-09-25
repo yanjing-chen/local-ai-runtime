@@ -26,7 +26,7 @@ from model_api import (
 )
 
 
-VERSION = "0.5.1"
+VERSION = "0.6.0"
 
 
 def expand_path(value):
@@ -712,6 +712,22 @@ class ApiHandler(BaseHTTPRequestHandler):
         path = parsed.path
 
         try:
+            if path == "/v1/models/inspect":
+                payload, _ = self.read_json_body(
+                    allow_empty=False
+                )
+
+                result = (
+                    self.model_controller
+                    .inspect_custom_model(payload)
+                )
+
+                self.send_json(
+                    200,
+                    result,
+                )
+                return
+
             if path == "/v1/models/custom":
                 payload, _ = self.read_json_body(
                     allow_empty=False

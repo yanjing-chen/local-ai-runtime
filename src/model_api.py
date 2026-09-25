@@ -16,6 +16,10 @@ from custom_model_api import (
     CustomModelError,
     CustomModelStore,
 )
+from gguf_inspector import (
+    GgufInspectionError,
+    inspect_gguf,
+)
 
 
 class ModelApiError(RuntimeError):
@@ -757,6 +761,50 @@ class ModelController:
                 self.custom_models.path
             ),
         }
+
+    def inspect_custom_model(self, payload):
+        if not isinstance(payload, dict):
+            raise ModelApiError(
+                "GGUF inspection payload must be an object."
+            )
+
+        auto_match = payload.get(
+            "auto_match_mmproj",
+            True,
+        )
+
+        if not isinstance(auto_match, bool):
+            raise ModelApiError(
+                "auto_match_mmproj must be boolean."
+            )
+
+        manifest = self._ensure_manifest()
+        reserved_ids = {
+            str(model.get("id"))
+            for model in manifest.get(
+                "models",
+                [],
+            )
+        }
+        reserved_ids.update(
+            str(model.get("id"))
+            for model in self.custom_models.list()
+        )
+
+        try:
+            return inspect_gguf(
+                payload.get("model_path"),
+                payload.get("mmproj_path", ""),
+                auto_match,
+                reserved_ids,
+            )
+
+        except GgufInspectionError as exc:
+            raise ModelApiError(
+                str(exc),
+                exc.status_code,
+                exc.error_type,
+            ) from exc
 
     def upsert_custom(self, payload):
         manifest = self._ensure_manifest()

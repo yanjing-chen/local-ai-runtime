@@ -55,8 +55,16 @@ Supported settings include:
 API routes:
 
     GET  /v1/models/custom
+    POST /v1/models/inspect
     POST /v1/models/custom
     POST /v1/models/custom/remove
+
+`POST /v1/models/inspect` reads a local GGUF header without loading the
+model. It suggests an id, display name, model type, conservative context
+size and capability flags. For multimodal models it checks GGUF files in
+the same directory and selects an MMProj only when one candidate is clearly
+matched by projector metadata and model-name hints. Ambiguous candidates are
+returned for manual selection. Every suggested value remains editable.
 
 The registry is stored by default at:
 
@@ -95,6 +103,7 @@ The current Runtime implements:
 - managed CPU / Vulkan llama.cpp runtime updates and rollback
 - verified model installation
 - persistent custom GGUF registration
+- automatic GGUF metadata inspection and MMProj discovery
 - real-time SSE streaming
 
 Model and llama.cpp runtime installation remain separate from client
