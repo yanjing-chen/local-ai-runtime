@@ -66,6 +66,7 @@
 - GNOME extension integration
 - HY-MT2-7B shared backend
 - 6800H memory validation
+- SSE streaming proxy regression test
 
 ## Stage 6
 - HunyuanOCR

@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import time
 from http.server import (
     BaseHTTPRequestHandler,
     ThreadingHTTPServer,
@@ -107,10 +108,81 @@ class Handler(BaseHTTPRequestHandler):
             )
         )
 
+        payload = {}
+
         if length:
-            self.rfile.read(
-                length
+            payload = json.loads(
+                self.rfile.read(
+                    length
+                )
             )
+
+        if payload.get("stream") is True:
+            self.send_response(
+                200
+            )
+            self.send_header(
+                "Content-Type",
+                "text/event-stream",
+            )
+            self.send_header(
+                "Cache-Control",
+                "no-cache",
+            )
+            self.end_headers()
+
+            events = (
+                {
+                    "id": "fake-stream",
+                    "object": (
+                        "chat.completion.chunk"
+                    ),
+                    "choices": [
+                        {
+                            "index": 0,
+                            "delta": {
+                                "content": "first",
+                            },
+                            "finish_reason": None,
+                        }
+                    ],
+                },
+                {
+                    "id": "fake-stream",
+                    "object": (
+                        "chat.completion.chunk"
+                    ),
+                    "choices": [
+                        {
+                            "index": 0,
+                            "delta": {
+                                "content": "second",
+                            },
+                            "finish_reason": None,
+                        }
+                    ],
+                },
+            )
+
+            for event in events:
+                data = json.dumps(
+                    event,
+                    separators=(",", ":"),
+                ).encode()
+
+                self.wfile.write(
+                    b"data: "
+                    + data
+                    + b"\n\n"
+                )
+                self.wfile.flush()
+                time.sleep(1.0)
+
+            self.wfile.write(
+                b"data: [DONE]\n\n"
+            )
+            self.wfile.flush()
+            return
 
         self.send_json(
             {

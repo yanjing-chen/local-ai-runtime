@@ -14,7 +14,8 @@ case "${1:-}" in
       "$ROOT/src/runtime_api.py" \
       "$ROOT/src/model_api.py" \
       "$ROOT/src/runtimectl.py" \
-      "$ROOT/tests/fake_llama_server.py"
+      "$ROOT/tests/fake_llama_server.py" \
+      "$ROOT/tests/streaming_proxy_test.py"
 
     echo "PYTHON SYNTAX        PASS"
 
@@ -176,6 +177,12 @@ CHECK
       "$ROOT/tests/model_switch_test.py" \
       "http://127.0.0.1:18121"
 
+    echo "===== STAGE 5D STREAMING TEST ====="
+
+    "$PY" \
+      "$ROOT/tests/streaming_proxy_test.py" \
+      "http://127.0.0.1:18121"
+
     cleanup_models
     trap - EXIT
 
@@ -187,6 +194,7 @@ CHECK
     echo "MODEL INSTALL         PASS"
     echo "MODEL SWITCH          PASS"
     echo "SINGLE RESIDENCY      PASS"
+    echo "STREAMING PROXY       PASS"
     echo "LOCAL AI RUNTIME STAGE 3A: PASS"
     ;;
 

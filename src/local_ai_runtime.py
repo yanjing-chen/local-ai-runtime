@@ -26,7 +26,7 @@ from model_api import (
 )
 
 
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 
 
 def expand_path(value):
@@ -880,6 +880,21 @@ class ApiHandler(BaseHTTPRequestHandler):
                     )
                 )
 
+                media_type = (
+                    content_type
+                    .split(
+                        ";",
+                        1,
+                    )[0]
+                    .strip()
+                    .lower()
+                )
+
+                event_stream = (
+                    media_type
+                    == "text/event-stream"
+                )
+
                 self.send_header(
                     "Content-Type",
                     content_type,
@@ -891,10 +906,23 @@ class ApiHandler(BaseHTTPRequestHandler):
                     )
                 )
 
-                if content_length_header:
+                if (
+                    content_length_header
+                    and not event_stream
+                ):
                     self.send_header(
                         "Content-Length",
                         content_length_header,
+                    )
+
+                if event_stream:
+                    self.send_header(
+                        "Cache-Control",
+                        "no-cache",
+                    )
+                    self.send_header(
+                        "X-Accel-Buffering",
+                        "no",
                     )
 
                 self.send_header(
@@ -903,18 +931,37 @@ class ApiHandler(BaseHTTPRequestHandler):
                 )
                 self.end_headers()
 
-                while True:
-                    chunk = upstream.read(
-                        65536
-                    )
+                try:
+                    if event_stream:
+                        while True:
+                            line = (
+                                upstream.readline()
+                            )
 
-                    if not chunk:
-                        break
+                            if not line:
+                                break
 
-                    self.wfile.write(
-                        chunk
-                    )
-                    self.wfile.flush()
+                            self.wfile.write(
+                                line
+                            )
+                            self.wfile.flush()
+
+                    else:
+                        while True:
+                            chunk = upstream.read(
+                                65536
+                            )
+
+                            if not chunk:
+                                break
+
+                            self.wfile.write(
+                                chunk
+                            )
+                            self.wfile.flush()
+
+                finally:
+                    upstream.close()
 
                 self.close_connection = True
 

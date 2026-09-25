@@ -35,6 +35,10 @@ When a request for another model arrives, Local AI Runtime will:
 
 An idle timeout can unload the active model automatically.
 
+Streaming chat completions are forwarded as Server-Sent Events without
+waiting for the complete response. Clients can use the standard OpenAI
+`"stream": true` request field.
+
 ## Current status
 
 Stage 0 implements:
