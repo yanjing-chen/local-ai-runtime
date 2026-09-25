@@ -33,6 +33,10 @@ MODELS = [
         ],
         "default_prompt": "OCR:",
         "capabilities": {
+            "chat": False,
+            "vision": True,
+            "ocr": True,
+            "translation": False,
             "custom_prompt": True,
             "streaming": True,
             "thinking": False,
@@ -62,6 +66,10 @@ MODELS = [
         ],
         "default_prompt": "",
         "capabilities": {
+            "chat": True,
+            "vision": False,
+            "ocr": False,
+            "translation": True,
             "custom_prompt": True,
             "streaming": True,
             "thinking": False,

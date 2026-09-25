@@ -68,6 +68,15 @@
 - 6800H memory validation
 - SSE streaming proxy regression test
 
+## Stage 6C — Runtime foundation complete
+- persistent custom GGUF model registry
+- optional MMProj path
+- context size and GPU layer settings
+- capability declarations
+- safe active-model unload on update or removal
+- external model files are never removed
+- Flameshot model-management UI remains the next Stage 6C step
+
 ## Stage 6
 - HunyuanOCR
 - per-model Prompt

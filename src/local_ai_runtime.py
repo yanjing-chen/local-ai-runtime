@@ -26,7 +26,7 @@ from model_api import (
 )
 
 
-VERSION = "0.3.2"
+VERSION = "0.4.0"
 
 
 def expand_path(value):
@@ -171,6 +171,13 @@ class RuntimeManager:
                 model_id
             ] = dict(
                 profile
+            )
+
+    def forget_model_profile(self, model_id):
+        with self.state_lock:
+            self.models.pop(
+                model_id,
+                None,
             )
 
     def stop_backend(self):
@@ -680,6 +687,13 @@ class ApiHandler(BaseHTTPRequestHandler):
             )
             return
 
+        if path == "/v1/models/custom":
+            self.send_json(
+                200,
+                self.model_controller.list_custom_status(),
+            )
+            return
+
         self.send_json(
             404,
             {
@@ -698,6 +712,93 @@ class ApiHandler(BaseHTTPRequestHandler):
         path = parsed.path
 
         try:
+            if path == "/v1/models/custom":
+                payload, _ = self.read_json_body(
+                    allow_empty=False
+                )
+
+                model_id = str(
+                    payload.get(
+                        "id",
+                        "",
+                    )
+                ).strip()
+
+                with self.manager.request_lock:
+                    status, created = (
+                        self.model_controller
+                        .upsert_custom(payload)
+                    )
+
+                    if (
+                        model_id
+                        and self.manager.current_model
+                        == model_id
+                    ):
+                        self.manager.stop_backend()
+
+                    self.manager.forget_model_profile(
+                        model_id
+                    )
+
+                self.send_json(
+                    201 if created else 200,
+                    status,
+                )
+                return
+
+            if path == "/v1/models/custom/remove":
+                payload, _ = self.read_json_body(
+                    allow_empty=False
+                )
+
+                model_id = str(
+                    payload.get(
+                        "model",
+                        "",
+                    )
+                ).strip()
+
+                if not model_id:
+                    raise ModelApiError(
+                        "Model id is required.",
+                        400,
+                        "invalid_request_error",
+                    )
+
+                with self.manager.request_lock:
+                    removed = (
+                        self.model_controller
+                        .remove_custom(model_id)
+                    )
+
+                    if (
+                        self.manager.current_model
+                        == model_id
+                    ):
+                        self.manager.stop_backend()
+
+                    self.manager.forget_model_profile(
+                        model_id
+                    )
+
+                self.send_json(
+                    200,
+                    {
+                        "id": model_id,
+                        "deleted": True,
+                        "files_removed": False,
+                        "model_path": removed[
+                            "model_path"
+                        ],
+                        "mmproj_path": removed.get(
+                            "mmproj_path",
+                            "",
+                        ),
+                    },
+                )
+                return
+
             if (
                 path
                 == "/v1/models/install"

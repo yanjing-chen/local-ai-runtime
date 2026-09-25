@@ -12,6 +12,11 @@ import urllib.request
 import uuid
 from pathlib import Path
 
+from custom_model_api import (
+    CustomModelError,
+    CustomModelStore,
+)
+
 
 class ModelApiError(RuntimeError):
     def __init__(
@@ -82,6 +87,10 @@ class ModelController:
         self.manifest_checked_at = None
 
         self.operations = {}
+
+        self.custom_models = (
+            CustomModelStore(config)
+        )
 
     def _read_json_source(self, source):
         if source.startswith(
@@ -195,6 +204,12 @@ class ModelController:
             if model.get("id") == model_id:
                 return model
 
+        for entry in self.custom_models.list():
+            if entry.get("id") == model_id:
+                return self.custom_models.as_model(
+                    entry
+                )
+
         raise ModelApiError(
             f"Unknown model: {model_id}",
             404,
@@ -236,6 +251,31 @@ class ModelController:
         return directory / name
 
     def is_installed(self, model):
+        if model.get("source_kind") == "custom":
+            model_path = Path(
+                model.get(
+                    "model_path",
+                    "",
+                )
+            )
+            mmproj_text = str(
+                model.get(
+                    "mmproj_path",
+                    "",
+                )
+            )
+
+            if not model_path.is_file():
+                return False
+
+            if (
+                mmproj_text
+                and not Path(mmproj_text).is_file()
+            ):
+                return False
+
+            return True
+
         directory = self._model_directory(
             model
         )
@@ -371,6 +411,13 @@ class ModelController:
         model = self._model_entry(
             model_id
         )
+
+        if model.get("source_kind") == "custom":
+            raise ModelApiError(
+                "Custom models use external files and do not need installation.",
+                409,
+                "custom_model_external",
+            )
 
         files = model.get(
             "files",
@@ -523,17 +570,35 @@ class ModelController:
             model_id
         )
 
-    def model_status(
-        self,
-        model_id,
-    ):
-        model = self._model_entry(
-            model_id
+    def _status_for_model(self, model):
+        inference_args = list(
+            model.get(
+                "inference",
+                {},
+            ).get(
+                "extra_args",
+                [],
+            )
         )
+
+        def argument_value(flag, default):
+            try:
+                position = inference_args.index(flag)
+                return int(
+                    inference_args[
+                        position + 1
+                    ]
+                )
+            except (
+                ValueError,
+                IndexError,
+                TypeError,
+            ):
+                return default
 
         operation = (
             self.operations.get(
-                model_id,
+                model["id"],
                 {
                     "state": "idle",
                     "action": None,
@@ -543,7 +608,7 @@ class ModelController:
             )
         )
 
-        return {
+        status = {
             "id": model["id"],
             "display_name": model.get(
                 "display_name",
@@ -563,10 +628,56 @@ class ModelController:
                 "capabilities",
                 {},
             ),
+            "source": (
+                "custom"
+                if model.get("source_kind") == "custom"
+                else "catalog"
+            ),
+            "editable": (
+                model.get("source_kind") == "custom"
+            ),
+            "context_size": argument_value(
+                "-c",
+                model.get(
+                    "context_size",
+                    4096,
+                ),
+            ),
+            "gpu_layers": argument_value(
+                "-ngl",
+                model.get(
+                    "gpu_layers",
+                    99,
+                ),
+            ),
+            "default_prompt": model.get(
+                "default_prompt",
+                "",
+            ),
             "operation": dict(
                 operation
             ),
         }
+
+        if model.get("source_kind") == "custom":
+            status.update(
+                {
+                    "model_path": model["model_path"],
+                    "mmproj_path": model["mmproj_path"],
+                    "context_size": model["context_size"],
+                    "gpu_layers": model["gpu_layers"],
+                }
+            )
+
+        return status
+
+    def model_status(
+        self,
+        model_id,
+    ):
+        return self._status_for_model(
+            self._model_entry(model_id)
+        )
 
     def list_status(
         self,
@@ -582,14 +693,31 @@ class ModelController:
 
         data = []
 
-        for model in manifest.get(
-            "models",
-            [],
-        ):
+        models = list(
+            manifest.get(
+                "models",
+                [],
+            )
+        )
+        catalog_ids = {
+            model.get("id")
+            for model in models
+        }
+        custom_entries = self.custom_models.list()
+        conflicts = sorted(
+            entry["id"]
+            for entry in custom_entries
+            if entry.get("id") in catalog_ids
+        )
+        models.extend(
+            self.custom_models.as_model(entry)
+            for entry in custom_entries
+            if entry.get("id") not in catalog_ids
+        )
+
+        for model in models:
             data.append(
-                self.model_status(
-                    model["id"]
-                )
+                self._status_for_model(model)
             )
 
         return {
@@ -599,15 +727,104 @@ class ModelController:
             "manifest_error": self.manifest_error,
             "manifest_checked_at":
             self.manifest_checked_at,
+            "custom_model_conflicts": conflicts,
         }
+
+    def list_custom_status(self):
+        manifest = self._ensure_manifest()
+        catalog_ids = {
+            model.get("id")
+            for model in manifest.get(
+                "models",
+                [],
+            )
+        }
+        data = []
+
+        for entry in self.custom_models.list():
+            status = self._status_for_model(
+                self.custom_models.as_model(entry)
+            )
+            status["conflicts_with_catalog"] = (
+                entry["id"] in catalog_ids
+            )
+            data.append(status)
+
+        return {
+            "object": "list",
+            "data": data,
+            "registry_path": str(
+                self.custom_models.path
+            ),
+        }
+
+    def upsert_custom(self, payload):
+        manifest = self._ensure_manifest()
+        reserved = {
+            str(model.get("id"))
+            for model in manifest.get(
+                "models",
+                [],
+            )
+        }
+
+        try:
+            entry, created = (
+                self.custom_models.upsert(
+                    payload,
+                    reserved,
+                )
+            )
+
+        except CustomModelError as exc:
+            raise ModelApiError(
+                str(exc),
+                exc.status_code,
+                exc.error_type,
+            ) from exc
+
+        return (
+            self._status_for_model(
+                self.custom_models.as_model(entry)
+            ),
+            created,
+        )
+
+    def remove_custom(self, model_id):
+        try:
+            removed = self.custom_models.remove(
+                model_id
+            )
+
+        except CustomModelError as exc:
+            raise ModelApiError(
+                str(exc),
+                exc.status_code,
+                exc.error_type,
+            ) from exc
+
+        with self.lock:
+            self.operations.pop(
+                model_id,
+                None,
+            )
+
+        return removed
 
     def start_install(
         self,
         model_id,
     ):
-        self._model_entry(
+        model = self._model_entry(
             model_id
         )
+
+        if model.get("source_kind") == "custom":
+            raise ModelApiError(
+                "Custom models use external files and do not need installation.",
+                409,
+                "custom_model_external",
+            )
 
         with self.lock:
             existing = self.operations.get(
@@ -708,6 +925,33 @@ class ModelController:
                 409,
                 "model_not_installed",
             )
+
+        if model.get("source_kind") == "custom":
+            return {
+                "id": model_id,
+                "model_path": model["model_path"],
+                "mmproj_path": model.get(
+                    "mmproj_path",
+                    "",
+                ),
+                "extra_args": list(
+                    model.get(
+                        "inference",
+                        {},
+                    ).get(
+                        "extra_args",
+                        [],
+                    )
+                ),
+                "default_prompt": model.get(
+                    "default_prompt",
+                    "",
+                ),
+                "capabilities": model.get(
+                    "capabilities",
+                    {},
+                ),
+            }
 
         directory = (
             self._model_directory(

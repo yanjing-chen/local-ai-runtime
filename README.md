@@ -39,6 +39,34 @@ Streaming chat completions are forwarded as Server-Sent Events without
 waiting for the complete response. Clients can use the standard OpenAI
 `"stream": true` request field.
 
+## Custom GGUF models
+
+Local AI Runtime 0.4 adds a persistent custom model registry. Custom models
+reference existing local GGUF files; registering or removing an entry never
+copies or deletes those files.
+
+Supported settings include:
+
+- model GGUF path
+- optional multimodal projector (MMProj) GGUF path
+- context size
+- GPU layer count
+- model type, default prompt and capability flags
+
+API routes:
+
+    GET  /v1/models/custom
+    POST /v1/models/custom
+    POST /v1/models/custom/remove
+
+The registry is stored by default at:
+
+    ~/.config/local-ai-runtime/custom-models.json
+
+Updating or removing the active custom model unloads its llama-server process.
+The next request starts the selected model with the new settings, preserving
+the single-model residency guarantee.
+
 ## Current status
 
 Stage 0 implements:

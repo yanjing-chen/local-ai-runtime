@@ -10,5 +10,6 @@
   "idle_unload_seconds": 600,
   "models": [],
   "model_root": "~/.local/share/local-ai-runtime/models",
+  "custom_model_registry": "~/.config/local-ai-runtime/custom-models.json",
   "model_manifest_url": "https://github.com/yanjing-chen/local-ai-runtime/releases/download/models-manifest/models.json"
 }

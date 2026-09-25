@@ -29,6 +29,10 @@
       ],
       "default_prompt": "OCR:",
       "capabilities": {
+        "chat": false,
+        "vision": true,
+        "ocr": true,
+        "translation": false,
         "custom_prompt": true,
         "streaming": true,
         "thinking": false,
@@ -65,6 +69,10 @@
       ],
       "default_prompt": "",
       "capabilities": {
+        "chat": true,
+        "vision": false,
+        "ocr": false,
+        "translation": true,
         "custom_prompt": true,
         "streaming": true,
         "thinking": false,

@@ -59,6 +59,10 @@ install -m 0644 \
     "$ROOT/src/model_api.py" \
     "$LIB_DIR/model_api.py"
 
+install -m 0644 \
+    "$ROOT/src/custom_model_api.py" \
+    "$LIB_DIR/custom_model_api.py"
+
 install -m 0755 \
     "$ROOT/src/runtimectl.py" \
     "$LIB_DIR/runtimectl.py"

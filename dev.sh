@@ -13,8 +13,10 @@ case "${1:-}" in
       "$ROOT/src/runtime_manager.py" \
       "$ROOT/src/runtime_api.py" \
       "$ROOT/src/model_api.py" \
+      "$ROOT/src/custom_model_api.py" \
       "$ROOT/src/runtimectl.py" \
       "$ROOT/tests/fake_llama_server.py" \
+      "$ROOT/tests/custom_model_test.py" \
       "$ROOT/tests/streaming_proxy_test.py"
 
     echo "PYTHON SYNTAX        PASS"
@@ -40,6 +42,7 @@ case "${1:-}" in
   "llama_runtime_root": "$TMP/runtime-live",
   "llama_runtime_manifest_url": "$RUNTIME_MANIFEST",
   "model_root": "$TMP/models-empty",
+  "custom_model_registry": "$TMP/custom-empty.json",
   "model_manifest_url": "",
   "startup_timeout_seconds": 5,
   "idle_unload_seconds": 5,
@@ -126,6 +129,7 @@ CHECK
   "llama_runtime_manifest_url": "$RUNTIME_MANIFEST",
 
   "model_root": "$TMP/live-models",
+  "custom_model_registry": "$TMP/custom-models.json",
   "model_manifest_url": "$MODEL_MANIFEST",
 
   "startup_timeout_seconds": 10,
@@ -183,6 +187,14 @@ CHECK
       "$ROOT/tests/streaming_proxy_test.py" \
       "http://127.0.0.1:18121"
 
+    echo "===== STAGE 6C CUSTOM MODEL TEST ====="
+
+    "$PY" \
+      "$ROOT/tests/custom_model_test.py" \
+      "http://127.0.0.1:18121" \
+      "$MODEL_FIXTURE/custom-files" \
+      "$TMP/custom-models.json"
+
     cleanup_models
     trap - EXIT
 
@@ -195,6 +207,7 @@ CHECK
     echo "MODEL SWITCH          PASS"
     echo "SINGLE RESIDENCY      PASS"
     echo "STREAMING PROXY       PASS"
+    echo "CUSTOM MODEL API      PASS"
     echo "LOCAL AI RUNTIME STAGE 3A: PASS"
     ;;
 
