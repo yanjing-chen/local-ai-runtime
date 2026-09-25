@@ -1,30 +1,31 @@
 {
   "schema_version": 1,
-  "latest": "llama-72797e891-r1",
+  "latest": "llama-828fdf282-r1",
   "runtimes": [
     {
-      "version": "llama-72797e891-r1",
-      "display_version": "llama.cpp 72797e891 r1",
+      "schema_version": 1,
+      "version": "llama-828fdf282-r1",
       "platform": "linux-x86_64",
       "backend": "llama.cpp",
-      "llama_cpp_ref": "72797e891",
+      "llama_cpp_ref": "828fdf282e195300c2965bd9511807e24ed53bdb",
       "archive": {
-        "name": "Local-AI-Runtime-llama-72797e891-r1-linux-x86_64.tar.gz",
-        "url": "RELEASE_URL_TO_BE_FILLED",
-        "size": 0,
-        "sha256": "TO_BE_FILLED",
-        "installed_size": 0
+        "name": "Local-AI-Runtime-llama-828fdf282-r1-linux-x86_64.tar.gz",
+        "size": 28231361,
+        "sha256": "2e78fca56bc2bcd7db2f19baeb832911b18b2797dbf1eb6ad89340639d9468dc",
+        "installed_size": 70297192,
+        "url": "https://github.com/yanjing-chen/local-ai-runtime/releases/download/llama-runtime-828fdf282-r1/Local-AI-Runtime-llama-828fdf282-r1-linux-x86_64.tar.gz"
       },
       "required_files": [
         {
           "path": "bin/llama-server-cpu",
-          "size": 0
+          "size": 18106616
         },
         {
           "path": "bin/llama-server-vulkan",
-          "size": 0
+          "size": 52190576
         }
-      ]
+      ],
+      "display_version": "llama.cpp b11103 / 828fdf282 r1 (CPU/Vulkan, HunyuanOCR 1.5 ready)"
     }
   ]
 }
