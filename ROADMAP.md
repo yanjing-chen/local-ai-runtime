@@ -91,6 +91,14 @@
 - external model files remain user-owned
 - Flameshot guided import UI remains the client-side follow-up
 
+## Stage 7A — Runtime complete
+- Runtime service starts without loading a model by default
+- optional persistent startup model preference
+- first client request still loads its requested model automatically
+- read-only status, catalog and inspection routes never load a model
+- changing the preference does not interrupt the active model
+- single-model residency remains enforced
+
 ## Stage 7
 - CUDA Runtime Manager integration
 - CUDA 12.8-r2 multi-architecture

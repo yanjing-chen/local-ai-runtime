@@ -34,6 +34,31 @@ When a request for another model arrives, Local AI Runtime will:
 
 An idle timeout can unload the active model automatically.
 
+## Optional startup preload
+
+Local AI Runtime 0.7 keeps the HTTP service available while leaving
+llama-server and all models unloaded by default. The first OCR, translation,
+or chat request automatically starts the requested model, so clients continue
+to work when startup preload is disabled.
+
+A client may configure one installed model to load after the next Runtime
+start:
+
+    GET  /v1/runtime/preferences
+    POST /v1/runtime/preferences
+
+Example request body:
+
+    {"preload_model":"paddleocr-vl-1.6"}
+
+Use an empty string to disable startup preload. Changing this preference does
+not interrupt the currently active model. Read-only health, status, model-list,
+and inspection requests never load a model.
+
+The preference is stored separately from the launch configuration at:
+
+    ~/.config/local-ai-runtime/preferences.json
+
 Streaming chat completions are forwarded as Server-Sent Events without
 waiting for the complete response. Clients can use the standard OpenAI
 `"stream": true` request field.
@@ -105,6 +130,7 @@ The current Runtime implements:
 - persistent custom GGUF registration
 - automatic GGUF metadata inspection and MMProj discovery
 - real-time SSE streaming
+- optional persistent startup preload, disabled by default
 
 Model and llama.cpp runtime installation remain separate from client
 applications. Removing Flameshot OCR does not remove this shared Runtime.

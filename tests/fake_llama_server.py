@@ -200,6 +200,11 @@ class Handler(BaseHTTPRequestHandler):
                                 + str(
                                     os.getpid()
                                 )
+                                + ":argv="
+                                + json.dumps(
+                                    unknown,
+                                    separators=(",", ":"),
+                                )
                             ),
                         },
                         "finish_reason": "stop",

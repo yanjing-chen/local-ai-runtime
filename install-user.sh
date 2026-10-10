@@ -67,6 +67,10 @@ install -m 0644 \
     "$ROOT/src/gguf_inspector.py" \
     "$LIB_DIR/gguf_inspector.py"
 
+install -m 0644 \
+    "$ROOT/src/preferences_api.py" \
+    "$LIB_DIR/preferences_api.py"
+
 # Runtime 0.5.0 briefly shipped an experimental HunyuanOCR converter.
 # Remove only that obsolete module during an upgrade. Model files and the
 # shared llama.cpp runtime are deliberately left untouched.

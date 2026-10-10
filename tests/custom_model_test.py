@@ -170,16 +170,14 @@ assert runtime["current_model"] == "custom-chat"
 first_pid = runtime["backend_pid"]
 assert first_pid
 
-command = Path(
-    f"/proc/{first_pid}/cmdline"
-).read_bytes().split(b"\0")
+command = json.loads(content.split(":argv=", 1)[1])
 
-assert b"-c" in command
-assert b"8192" in command
-assert b"-ngl" in command
-assert b"17" in command
-assert b"--mmproj" in command
-assert str(mmproj_path).encode() in command
+assert "-c" in command
+assert "8192" in command
+assert "-ngl" in command
+assert "17" in command
+assert "--mmproj" in command
+assert str(mmproj_path) in command
 
 status, invalid_update = request(
     "POST",
@@ -246,6 +244,9 @@ status, chat = request(
 
 assert status == 200, chat
 
+content = chat["choices"][0]["message"]["content"]
+command = json.loads(content.split(":argv=", 1)[1])
+
 _, runtime = request(
     "GET",
     "/v1/runtime/status",
@@ -254,12 +255,8 @@ _, runtime = request(
 second_pid = runtime["backend_pid"]
 assert second_pid and second_pid != first_pid
 
-command = Path(
-    f"/proc/{second_pid}/cmdline"
-).read_bytes().split(b"\0")
-
-assert b"4096" in command
-assert b"9" in command
+assert "4096" in command
+assert "9" in command
 
 status, catalog_chat = request(
     "POST",

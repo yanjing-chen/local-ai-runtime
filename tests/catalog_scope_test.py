@@ -49,12 +49,18 @@ for relative in (
 
 installer = (ROOT / "install-user.sh").read_text(encoding="utf-8")
 assert 'rm -f "$LIB_DIR/hunyuanocr_installer.py"' in installer
+assert '"$ROOT/src/preferences_api.py"' in installer
 assert "hunyuanocr_converter_root" not in installer
 assert "model.safetensors" not in installer
 
 assert not (ROOT / "src" / "hunyuanocr_installer.py").exists()
 assert not (ROOT / "tests" / "hunyuanocr_recipe_test.py").exists()
 assert not (ROOT / "tests" / "fake_hunyuanocr_converter.py").exists()
+
+bundle = (ROOT / "packaging/app/build-user-bundle.sh").read_text(
+    encoding="utf-8"
+)
+assert '"$ROOT/src/preferences_api.py"' in bundle
 
 print("SUPPORTED CATALOG SCOPE PASS")
 print("HUNYUANOCR PAYLOAD      NONE")

@@ -25,8 +25,13 @@ from model_api import (
     ModelApiError,
 )
 
+from preferences_api import (
+    RuntimePreferences,
+    RuntimePreferenceError,
+)
 
-VERSION = "0.6.0"
+
+VERSION = "0.7.0"
 
 
 def expand_path(value):
@@ -101,9 +106,13 @@ class RuntimeManager:
         self.last_used = 0.0
 
         self.request_lock = threading.Lock()
-        self.state_lock = threading.Lock()
+        self.state_lock = threading.RLock()
 
         self.stop_event = threading.Event()
+
+        self.preload_model = ""
+        self.preload_state = "disabled"
+        self.preload_error = None
 
         self.idle_thread = threading.Thread(
             target=self._idle_worker,
@@ -159,7 +168,31 @@ class RuntimeManager:
                 else False
             ),
             "idle_unload_seconds": self.idle_timeout,
+            "startup_preload": self.preload_status(),
         }
+
+    def preload_status(self):
+        with self.state_lock:
+            return {
+                "enabled": bool(self.preload_model),
+                "model": self.preload_model,
+                "state": self.preload_state,
+                "error": self.preload_error,
+            }
+
+    def configure_preload(self, model_id, state=None, error=None):
+        with self.state_lock:
+            self.preload_model = str(model_id or "").strip()
+            self.preload_state = (
+                state
+                if state is not None
+                else (
+                    "configured"
+                    if self.preload_model
+                    else "disabled"
+                )
+            )
+            self.preload_error = error
 
     def set_model_profile(
         self,
@@ -536,6 +569,10 @@ class ApiHandler(BaseHTTPRequestHandler):
             .model_controller
         )
 
+    @property
+    def preferences(self):
+        return self.server.runtime_preferences
+
     def send_json(
         self,
         status,
@@ -645,6 +682,16 @@ class ApiHandler(BaseHTTPRequestHandler):
             )
             return
 
+        if path == "/v1/runtime/preferences":
+            self.send_json(
+                200,
+                {
+                    **self.preferences.status(),
+                    "startup_preload": self.manager.preload_status(),
+                },
+            )
+            return
+
         if path == "/v1/runtime/llama/status":
             refresh = (
                 query.get(
@@ -712,6 +759,45 @@ class ApiHandler(BaseHTTPRequestHandler):
         path = parsed.path
 
         try:
+            if path == "/v1/runtime/preferences":
+                payload, _ = self.read_json_body(
+                    allow_empty=False
+                )
+
+                if "preload_model" not in payload:
+                    raise RuntimePreferenceError(
+                        "preload_model is required.",
+                        400,
+                        "invalid_request_error",
+                    )
+
+                model_id = payload["preload_model"]
+
+                if isinstance(model_id, str) and model_id.strip():
+                    self.model_controller.runtime_profile(
+                        model_id.strip()
+                    )
+
+                result = self.preferences.set_preload_model(
+                    model_id
+                )
+                self.manager.configure_preload(
+                    result["preload_model"],
+                    "pending_restart"
+                    if result["preload_enabled"]
+                    else "disabled",
+                )
+
+                self.send_json(
+                    200,
+                    {
+                        **result,
+                        "applies_on_next_start": True,
+                        "startup_preload": self.manager.preload_status(),
+                    },
+                )
+                return
+
             if path == "/v1/models/inspect":
                 payload, _ = self.read_json_body(
                     allow_empty=False
@@ -1108,6 +1194,17 @@ class ApiHandler(BaseHTTPRequestHandler):
                 },
             )
 
+        except RuntimePreferenceError as exc:
+            self.send_json(
+                exc.status_code,
+                {
+                    "error": {
+                        "message": str(exc),
+                        "type": exc.error_type,
+                    }
+                },
+            )
+
         except Exception as exc:
             self.send_json(
                 503,
@@ -1222,6 +1319,15 @@ def main():
         )
     )
 
+    preferences = RuntimePreferences(
+        config
+    )
+
+    preference_status = preferences.status()
+    manager.configure_preload(
+        preference_status["preload_model"]
+    )
+
     server = ThreadingHTTPServer(
         (
             host,
@@ -1237,6 +1343,7 @@ def main():
     server.model_controller = (
         model_controller
     )
+    server.runtime_preferences = preferences
 
     def request_shutdown(
         signum,
@@ -1263,6 +1370,62 @@ def main():
         f"http://{host}:{port}",
         flush=True,
     )
+
+    def preload_at_startup():
+        model_id = preferences.status()[
+            "preload_model"
+        ]
+
+        if not model_id:
+            manager.configure_preload(
+                "",
+                "disabled",
+            )
+            return
+
+        manager.configure_preload(
+            model_id,
+            "loading",
+        )
+
+        try:
+            profile = model_controller.runtime_profile(
+                model_id
+            )
+            manager.set_model_profile(
+                model_id,
+                profile,
+            )
+
+            with manager.request_lock:
+                manager.ensure_model(
+                    model_id
+                )
+
+            manager.configure_preload(
+                model_id,
+                "loaded",
+            )
+
+        except Exception as exc:
+            manager.configure_preload(
+                model_id,
+                "error",
+                str(exc),
+            )
+            print(
+                "Startup model preload failed: "
+                f"{exc}",
+                file=sys.stderr,
+                flush=True,
+            )
+
+    preload_thread = threading.Thread(
+        target=preload_at_startup,
+        name="local-ai-runtime-preload",
+        daemon=True,
+    )
+    preload_thread.start()
 
     try:
         server.serve_forever()

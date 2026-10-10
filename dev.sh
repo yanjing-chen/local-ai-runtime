@@ -15,11 +15,13 @@ case "${1:-}" in
       "$ROOT/src/model_api.py" \
       "$ROOT/src/custom_model_api.py" \
       "$ROOT/src/gguf_inspector.py" \
+      "$ROOT/src/preferences_api.py" \
       "$ROOT/src/runtimectl.py" \
       "$ROOT/tests/fake_llama_server.py" \
       "$ROOT/tests/catalog_scope_test.py" \
       "$ROOT/tests/custom_model_test.py" \
       "$ROOT/tests/gguf_inspector_test.py" \
+      "$ROOT/tests/preload_preference_test.py" \
       "$ROOT/tests/streaming_proxy_test.py"
 
     echo "PYTHON SYNTAX        PASS"
@@ -49,6 +51,7 @@ case "${1:-}" in
   "llama_runtime_manifest_url": "$RUNTIME_MANIFEST",
   "model_root": "$TMP/models-empty",
   "custom_model_registry": "$TMP/custom-empty.json",
+  "preferences_file": "$TMP/preferences-empty.json",
   "model_manifest_url": "",
   "startup_timeout_seconds": 5,
   "idle_unload_seconds": 5,
@@ -136,6 +139,7 @@ CHECK
 
   "model_root": "$TMP/live-models",
   "custom_model_registry": "$TMP/custom-models.json",
+  "preferences_file": "$TMP/preferences.json",
   "model_manifest_url": "$MODEL_MANIFEST",
 
   "startup_timeout_seconds": 10,
@@ -211,6 +215,84 @@ CHECK
     cleanup_models
     trap - EXIT
 
+    echo "===== STAGE 7A STARTUP PRELOAD TEST ====="
+
+    cat > "$TMP/config-preload.json" <<JSON
+{
+  "listen_host": "127.0.0.1",
+  "listen_port": 18122,
+  "backend_host": "127.0.0.1",
+  "backend_port": 18182,
+  "llama_server": "$FAKE_SERVER",
+  "llama_runtime_root": "$TMP/runtime-unused",
+  "llama_runtime_manifest_url": "$RUNTIME_MANIFEST",
+  "model_root": "$TMP/live-models",
+  "custom_model_registry": "$TMP/custom-models.json",
+  "preferences_file": "$TMP/preferences.json",
+  "model_manifest_url": "$MODEL_MANIFEST",
+  "startup_timeout_seconds": 10,
+  "idle_unload_seconds": 30,
+  "models": []
+}
+JSON
+
+    rm -f "$TMP/preferences.json"
+
+    start_preload_runtime() {
+      "$PY" \
+        "$ROOT/src/local_ai_runtime.py" \
+        --config "$TMP/config-preload.json" \
+        >"$TMP/preload.log" 2>&1 &
+      PRELOAD_PID=$!
+
+      READY=0
+      for _ in $(seq 1 100); do
+        if "$PY" - <<CHECK >/dev/null 2>&1
+import urllib.request
+urllib.request.urlopen(
+    "http://127.0.0.1:18122/health",
+    timeout=1,
+).read()
+CHECK
+        then
+          READY=1
+          break
+        fi
+        sleep 0.1
+      done
+
+      if [[ "$READY" != "1" ]]; then
+        cat "$TMP/preload.log"
+        exit 1
+      fi
+    }
+
+    stop_preload_runtime() {
+      kill "$PRELOAD_PID" 2>/dev/null || true
+      wait "$PRELOAD_PID" 2>/dev/null || true
+    }
+
+    start_preload_runtime
+    trap stop_preload_runtime EXIT
+    "$PY" "$ROOT/tests/preload_preference_test.py" \
+      "http://127.0.0.1:18122" configure "$TMP/preferences.json"
+    stop_preload_runtime
+    trap - EXIT
+
+    start_preload_runtime
+    trap stop_preload_runtime EXIT
+    "$PY" "$ROOT/tests/preload_preference_test.py" \
+      "http://127.0.0.1:18122" verify-loaded "$TMP/preferences.json"
+    stop_preload_runtime
+    trap - EXIT
+
+    start_preload_runtime
+    trap stop_preload_runtime EXIT
+    "$PY" "$ROOT/tests/preload_preference_test.py" \
+      "http://127.0.0.1:18122" verify-disabled "$TMP/preferences.json"
+    stop_preload_runtime
+    trap - EXIT
+
     echo "===== RESULT ====="
     echo "STAGE 0 API           PASS"
     echo "RUNTIME MANAGER       PASS"
@@ -222,6 +304,7 @@ CHECK
     echo "STREAMING PROXY       PASS"
     echo "CUSTOM MODEL API      PASS"
     echo "GGUF INSPECTION API   PASS"
+    echo "STARTUP PRELOAD       PASS"
     echo "LOCAL AI RUNTIME STAGE 3A: PASS"
     ;;
 
