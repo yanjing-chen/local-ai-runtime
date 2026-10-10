@@ -129,7 +129,9 @@ EOF
     systemctl --user daemon-reload
 
     if [[ "$START_SERVICE" = "1" ]]; then
-        systemctl --user enable --now \
+        systemctl --user enable \
+            local-ai-runtime.service
+        systemctl --user restart \
             local-ai-runtime.service
     fi
 fi

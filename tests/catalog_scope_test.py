@@ -50,6 +50,9 @@ for relative in (
 installer = (ROOT / "install-user.sh").read_text(encoding="utf-8")
 assert 'rm -f "$LIB_DIR/hunyuanocr_installer.py"' in installer
 assert '"$ROOT/src/preferences_api.py"' in installer
+assert "systemctl --user enable \\\n" in installer
+assert "systemctl --user restart \\\n" in installer
+assert "enable --now" not in installer
 assert "hunyuanocr_converter_root" not in installer
 assert "model.safetensors" not in installer
 
