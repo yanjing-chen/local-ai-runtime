@@ -903,6 +903,69 @@ class ApiHandler(BaseHTTPRequestHandler):
 
             if (
                 path
+                == "/v1/models/remove"
+            ):
+                payload, _ = (
+                    self.read_json_body(
+                        allow_empty=False
+                    )
+                )
+
+                model_id = str(
+                    payload.get(
+                        "model",
+                        "",
+                    )
+                ).strip()
+
+                if not model_id:
+                    raise ModelApiError(
+                        "Model id is required.",
+                        400,
+                        "invalid_request_error",
+                    )
+
+                with self.manager.request_lock:
+                    if (
+                        self.manager.current_model
+                        == model_id
+                    ):
+                        self.manager.stop_backend()
+
+                    status, files_removed = (
+                        self.model_controller
+                        .uninstall(model_id)
+                    )
+                    self.manager.forget_model_profile(
+                        model_id
+                    )
+
+                    preference = self.preferences.status()
+                    preload_cleared = (
+                        preference["preload_model"]
+                        == model_id
+                    )
+                    if preload_cleared:
+                        self.preferences.set_preload_model("")
+                        self.manager.configure_preload(
+                            "",
+                            "disabled",
+                        )
+
+                self.send_json(
+                    200,
+                    {
+                        "id": model_id,
+                        "deleted": True,
+                        "files_removed": files_removed,
+                        "preload_cleared": preload_cleared,
+                        "model": status,
+                    },
+                )
+                return
+
+            if (
+                path
                 == "/v1/models/install"
             ):
                 payload, _ = (

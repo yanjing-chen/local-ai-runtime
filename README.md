@@ -19,7 +19,6 @@ The client explicitly selects a model using the OpenAI `model` field.
 Examples:
 
     paddleocr-vl-1.6
-    hy-mt2-7b
 
 Only one large model is intended to remain resident at a time.
 
@@ -83,6 +82,7 @@ API routes:
     POST /v1/models/inspect
     POST /v1/models/custom
     POST /v1/models/custom/remove
+    POST /v1/models/remove
 
 `POST /v1/models/inspect` reads a local GGUF header without loading the
 model. It suggests an id, display name, model type, conservative context
@@ -104,7 +104,7 @@ the single-model residency guarantee.
 The supported public catalog intentionally stays small:
 
 - PaddleOCR-VL 1.6 for OCR and vision
-- Hy-MT2 7B Q4_K_M for translation and chat
+- other GGUF models may be registered as custom local models
 
 Other compatible local models can be registered through the custom GGUF API.
 Local AI Runtime never copies or removes the external files used by a custom

@@ -10,7 +10,6 @@ manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
 expected_ids = {
     "paddleocr-vl-1.6",
-    "hy-mt2-7b",
 }
 actual_ids = {
     str(model.get("id", ""))
@@ -55,6 +54,15 @@ assert "systemctl --user restart \\\n" in installer
 assert "enable --now" not in installer
 assert "hunyuanocr_converter_root" not in installer
 assert "model.safetensors" not in installer
+
+runtime_source = (ROOT / "src" / "local_ai_runtime.py").read_text(
+    encoding="utf-8"
+)
+model_api = (ROOT / "src" / "model_api.py").read_text(encoding="utf-8")
+assert 'path\n                == "/v1/models/remove"' in runtime_source
+assert "Custom model removal only unregisters external files." in model_api
+assert "MODEL_ID_PATTERN.fullmatch(model_id)" in model_api
+assert "Unsafe managed model directory." in model_api
 
 assert not (ROOT / "src" / "hunyuanocr_installer.py").exists()
 assert not (ROOT / "tests" / "hunyuanocr_recipe_test.py").exists()

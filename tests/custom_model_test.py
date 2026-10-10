@@ -349,6 +349,92 @@ assert registry_data == {
 }
 assert registry.stat().st_mode & 0o777 == 0o600
 
+status, preference = request(
+    "POST",
+    "/v1/runtime/preferences",
+    {
+        "preload_model": "model-a",
+    },
+)
+assert status == 200, preference
+
+status, chat = request(
+    "POST",
+    "/v1/chat/completions",
+    {
+        "model": "model-a",
+        "messages": [
+            {
+                "role": "user",
+                "content": "remove active catalog model",
+            }
+        ],
+    },
+)
+assert status == 200, chat
+
+status, removed_catalog = request(
+    "POST",
+    "/v1/models/remove",
+    {
+        "model": "model-a",
+    },
+)
+assert status == 200, removed_catalog
+assert removed_catalog["deleted"] is True
+assert removed_catalog["files_removed"] is True
+assert removed_catalog["preload_cleared"] is True
+assert removed_catalog["model"]["installed"] is False
+
+_, runtime = request(
+    "GET",
+    "/v1/runtime/status",
+)
+assert runtime["current_model"] is None
+assert runtime["backend_running"] is False
+
+_, preference = request(
+    "GET",
+    "/v1/runtime/preferences",
+)
+assert preference["preload_enabled"] is False
+assert preference["preload_model"] == ""
+
+status, custom_remove_guard = request(
+    "POST",
+    "/v1/models/remove",
+    {
+        "model": "custom-chat",
+    },
+)
+assert status == 404, custom_remove_guard
+
+status, reinstall = request(
+    "POST",
+    "/v1/models/install",
+    {
+        "model": "model-a",
+    },
+)
+assert status == 202, reinstall
+
+deadline = time.time() + 20
+while time.time() < deadline:
+    _, models = request(
+        "GET",
+        "/v1/models",
+    )
+    restored = next(
+        item
+        for item in models["data"]
+        if item["id"] == "model-a"
+    )
+    if restored["operation"]["state"] in ("success", "error"):
+        break
+    time.sleep(0.1)
+assert restored["operation"]["state"] == "success", restored
+assert restored["installed"] is True
+
 print("CUSTOM REGISTER       PASS")
 print("CUSTOM UPDATE         PASS")
 print("CUSTOM REMOVE         PASS")
@@ -360,4 +446,6 @@ print("CAPABILITIES          PASS")
 print("ACTIVE MODEL UNLOAD   PASS")
 print("INVALID UPDATE GUARD   PASS")
 print("CUSTOM/CATALOG SWITCH  PASS")
+print("CATALOG MODEL REMOVE   PASS")
+print("REMOVE PRELOAD GUARD   PASS")
 print("CUSTOM MODEL API      PASS")

@@ -15,6 +15,7 @@ from pathlib import Path
 from custom_model_api import (
     CustomModelError,
     CustomModelStore,
+    MODEL_ID_PATTERN,
 )
 from gguf_inspector import (
     GgufInspectionError,
@@ -161,9 +162,9 @@ class ModelController:
                     )
                 ).strip()
 
-                if not model_id:
+                if not MODEL_ID_PATTERN.fullmatch(model_id):
                     raise ModelApiError(
-                        "Model entry has no id."
+                        "Model entry has an invalid id."
                     )
 
                 if model_id in seen:
@@ -552,26 +553,55 @@ class ModelController:
             model_id
         )
 
-        directory = (
-            self._model_directory(
-                model
+        if model.get("source_kind") == "custom":
+            raise ModelApiError(
+                "Custom model removal only unregisters external files.",
+                409,
+                "custom_model_external",
             )
-        )
+
+        with self.lock:
+            existing = self.operations.get(
+                model_id
+            )
+            if (
+                existing
+                and existing.get("state")
+                == "running"
+            ):
+                raise ModelApiError(
+                    "A model operation is already running.",
+                    409,
+                    "operation_in_progress",
+                )
+
+        directory = (
+            self.root / model["id"]
+        ).resolve()
+        if directory.parent != self.root.resolve():
+            raise ModelApiError(
+                "Unsafe managed model directory."
+            )
+        files_removed = directory.exists()
 
         if directory.exists():
             shutil.rmtree(
                 directory
             )
 
-        parent = directory.parent
+        with self.lock:
+            self.operations[model_id] = {
+                "state": "success",
+                "action": "remove",
+                "job_id": None,
+                "error": None,
+                "started_at": time.time(),
+                "finished_at": time.time(),
+            }
 
-        try:
-            parent.rmdir()
-        except OSError:
-            pass
-
-        return self.model_status(
-            model_id
+        return (
+            self.model_status(model_id),
+            files_removed,
         )
 
     def _status_for_model(self, model):

@@ -52,39 +52,6 @@ MODELS = [
             ]
         },
     },
-    {
-        "id": "hy-mt2-7b",
-        "display_name": "Hy-MT2 7B Q4_K_M",
-        "version": "Q4_K_M",
-        "type": "translation",
-        "repo": "tencent/Hy-MT2-7B-GGUF",
-        "files": [
-            {
-                "role": "model",
-                "filename": "Hy-MT2-7B-Q4_K_M.gguf",
-            },
-        ],
-        "default_prompt": "",
-        "capabilities": {
-            "chat": True,
-            "vision": False,
-            "ocr": False,
-            "translation": True,
-            "custom_prompt": True,
-            "streaming": True,
-            "thinking": False,
-            "temperature": True,
-            "context_size": True,
-        },
-        "inference": {
-            "extra_args": [
-                "-c",
-                "4096",
-                "-ngl",
-                "99",
-            ]
-        },
-    },
 ]
 
 

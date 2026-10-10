@@ -37,14 +37,14 @@
 
 ## Stage 3B — complete
 - official PaddleOCR-VL-1.6 catalog entry
-- official Tencent Hy-MT2-7B Q4_K_M catalog entry
+- custom local GGUF registration for translation models such as Hy-MT2
 - immutable Hugging Face revision pinning
 - verified upstream file sizes and SHA-256 metadata
 - public models manifest
 
 ## Stage 3C — complete
 - real PaddleOCR-VL installation
-- real Hy-MT2-7B installation
+- real custom translation-model registration
 - Vulkan inference
 - OCR -> translation model switching
 - RAM / VRAM validation
@@ -79,7 +79,7 @@
 
 ## Stage 6D — closed
 - llama.cpp b11103 CPU/Vulkan runtime retained
-- PaddleOCR and Hy-MT2 regressions passed on Ryzen 7 6800H
+- PaddleOCR and custom-model regressions passed on Ryzen 7 6800H
 - experimental HunyuanOCR source converter withdrawn in Runtime 0.5.1
 - no HunyuanOCR model entry, converter or Python dependency payload
 
