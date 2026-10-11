@@ -84,6 +84,10 @@ CUDA user-space libraries are downloaded only when requested. The NVIDIA
 driver and its `libcuda.so.1` remain host requirements. No client package owns
 or bundles these files.
 
+The validated `cuda-12.8-r3` package targets NVIDIA architectures sm75, sm86,
+sm89 and sm120. It is published independently from client packages through the
+Runtime CUDA manifest and was validated on an RTX 3050 Laptop GPU (sm86).
+
 Streaming chat completions are forwarded as Server-Sent Events without
 waiting for the complete response. Clients can use the standard OpenAI
 `"stream": true` request field.

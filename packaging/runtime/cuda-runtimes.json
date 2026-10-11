@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "latest": "cuda-12.8-r3",
+  "runtimes": [
+    {
+      "version": "12.8-r1",
+      "display_version": "12.8-r1 (sm86)",
+      "channel": "experimental",
+      "platform": "linux-x86_64",
+      "backend": "cuda",
+      "cuda_toolkit": "12.8.1",
+      "llama_cpp_ref": "72797e891",
+      "gpu_architectures": [
+        "sm86"
+      ],
+      "archive": {
+        "name": "Flameshot-OCR-CUDA-12.8-r1-sm86.tar.zst",
+        "url": "https://github.com/yanjing-chen/flameshot-ocr/releases/download/cuda-runtime-12.8-r1-sm86/Flameshot-OCR-CUDA-12.8-r1-sm86.tar.zst",
+        "size": 515204221,
+        "sha256": "21d4febc94847568194457170f9563371c5e244513087b167164b1e874efda45",
+        "installed_size": 942309110
+      },
+      "required_files": [
+        {
+          "path": "llama-server-cuda",
+          "size": 206
+        },
+        {
+          "path": "llama-server-cuda.bin",
+          "size": 73419736
+        },
+        {
+          "path": "lib/libcudart.so.12",
+          "size": 728800
+        },
+        {
+          "path": "lib/libcublas.so.12",
+          "size": 116388640
+        },
+        {
+          "path": "lib/libcublasLt.so.12",
+          "size": 751771728
+        }
+      ]
+    },
+    {
+      "version": "12.8-r2",
+      "display_version": "12.8-r2 (RTX 20/30/40/50)",
+      "channel": "experimental",
+      "platform": "linux-x86_64",
+      "backend": "cuda",
+      "cuda_toolkit": "12.8.1",
+      "llama_cpp_ref": "72797e891",
+      "gpu_architectures": [
+        "sm75",
+        "sm86",
+        "sm89",
+        "sm120a"
+      ],
+      "archive": {
+        "name": "Flameshot-OCR-CUDA-12.8-r2-multiarch.tar.zst",
+        "url": "https://github.com/yanjing-chen/flameshot-ocr/releases/download/cuda-runtime-12.8-r2-multiarch/Flameshot-OCR-CUDA-12.8-r2-multiarch.tar.zst",
+        "size": 566611064,
+        "sha256": "4b524a34ad7937234fa44768f5d8e5a0b8793dcbaa487224f767983cdce63b3e",
+        "installed_size": 994234102
+      },
+      "required_files": [
+        {
+          "path": "llama-server-cuda",
+          "size": 206
+        },
+        {
+          "path": "llama-server-cuda.bin",
+          "size": 125344728
+        },
+        {
+          "path": "lib/libcudart.so.12",
+          "size": 728800
+        },
+        {
+          "path": "lib/libcublas.so.12",
+          "size": 116388640
+        },
+        {
+          "path": "lib/libcublasLt.so.12",
+          "size": 751771728
+        }
+      ]
+    },
+    {
+      "version": "cuda-12.8-r3",
+      "display_version": "CUDA 12.8 r3 (RTX 20/30/40/50)",
+      "channel": "release-candidate",
+      "platform": "linux-x86_64",
+      "backend": "cuda",
+      "cuda_toolkit": "12.8.1",
+      "llama_cpp_ref": "828fdf282e195300c2965bd9511807e24ed53bdb",
+      "cuda_architectures": [
+        "sm75",
+        "sm86",
+        "sm89",
+        "sm120"
+      ],
+      "archive": {
+        "name": "Local-AI-Runtime-CUDA-cuda-12.8-r3-linux-x86_64.tar.zst",
+        "url": "https://github.com/yanjing-chen/local-ai-runtime/releases/download/cuda-runtime-12.8-r3/Local-AI-Runtime-CUDA-cuda-12.8-r3-linux-x86_64.tar.zst",
+        "size": 566681000,
+        "sha256": "3585432ed322c3264680d80ce04418d7d6ac209c831559e830ab0992f1eaa894",
+        "installed_size": 994344726
+      },
+      "required_files": [
+        {
+          "path": "llama-server-cuda",
+          "size": 206
+        },
+        {
+          "path": "llama-server-cuda.bin",
+          "size": 125455352
+        },
+        {
+          "path": "lib/libcudart.so.12",
+          "size": 728800
+        },
+        {
+          "path": "lib/libcublas.so.12",
+          "size": 116388640
+        },
+        {
+          "path": "lib/libcublasLt.so.12",
+          "size": 751771728
+        }
+      ]
+    }
+  ]
+}
