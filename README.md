@@ -58,6 +58,32 @@ The preference is stored separately from the launch configuration at:
 
     ~/.config/local-ai-runtime/preferences.json
 
+## Acceleration backends (0.8 development)
+
+Local AI Runtime 0.8 owns backend selection for all clients. The persistent
+preference may be `auto`, `cuda`, `vulkan`, or `cpu`; `auto` tries CUDA first,
+then Vulkan, then CPU. A requested unavailable accelerator falls back safely
+without changing the stored preference.
+
+    GET  /v1/runtime/backends
+    POST /v1/runtime/preferences
+
+Example request body:
+
+    {"backend_preference":"cuda"}
+
+Changing the preference unloads an active model and applies to the next model
+request. CPU/Vulkan and CUDA runtime files have separate versioned roots. CUDA
+installation and rollback are also exposed through the Runtime API:
+
+    GET  /v1/runtime/cuda/status?refresh=1
+    POST /v1/runtime/cuda/install
+    POST /v1/runtime/cuda/rollback
+
+CUDA user-space libraries are downloaded only when requested. The NVIDIA
+driver and its `libcuda.so.1` remain host requirements. No client package owns
+or bundles these files.
+
 Streaming chat completions are forwarded as Server-Sent Events without
 waiting for the complete response. Clients can use the standard OpenAI
 `"stream": true` request field.
@@ -131,6 +157,8 @@ The current Runtime implements:
 - automatic GGUF metadata inspection and MMProj discovery
 - real-time SSE streaming
 - optional persistent startup preload, disabled by default
+- persistent automatic/CUDA/Vulkan/CPU backend preference
+- independently installed, verified and rollback-capable CUDA runtime
 
 Model and llama.cpp runtime installation remain separate from client
 applications. Removing Flameshot OCR does not remove this shared Runtime.

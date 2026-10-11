@@ -47,6 +47,7 @@ class RuntimePreferences:
         return {
             "schema_version": 1,
             "preload_model": "",
+            "backend_preference": "auto",
         }
 
     def _load_unlocked(self):
@@ -95,6 +96,24 @@ class RuntimePreferences:
         data["preload_model"] = (
             preload_model.strip()
         )
+
+        backend_preference = data.get(
+            "backend_preference",
+            "auto",
+        )
+        if backend_preference not in (
+            "auto",
+            "cuda",
+            "vulkan",
+            "cpu",
+        ):
+            raise RuntimePreferenceError(
+                "backend_preference must be auto, cuda, vulkan or cpu.",
+                500,
+                "runtime_preference_store_error",
+            )
+
+        data["backend_preference"] = backend_preference
         return data
 
     def _write_unlocked(self, data):
@@ -148,6 +167,7 @@ class RuntimePreferences:
         return {
             "preload_enabled": bool(model_id),
             "preload_model": model_id,
+            "backend_preference": data["backend_preference"],
         }
 
     def set_preload_model(self, model_id):
@@ -167,12 +187,37 @@ class RuntimePreferences:
                 "invalid_request_error",
             )
 
-        data = {
-            "schema_version": 1,
-            "preload_model": model_id,
-        }
+        with self.lock:
+            data = self._load_unlocked()
+            data["preload_model"] = model_id
+            self._write_unlocked(data)
+
+        return self.status()
+
+    def set_backend_preference(self, backend):
+        if not isinstance(backend, str):
+            raise RuntimePreferenceError(
+                "backend_preference must be a string.",
+                400,
+                "invalid_request_error",
+            )
+
+        backend = backend.strip().lower()
+        if backend not in (
+            "auto",
+            "cuda",
+            "vulkan",
+            "cpu",
+        ):
+            raise RuntimePreferenceError(
+                "backend_preference must be auto, cuda, vulkan or cpu.",
+                400,
+                "invalid_request_error",
+            )
 
         with self.lock:
+            data = self._load_unlocked()
+            data["backend_preference"] = backend
             self._write_unlocked(data)
 
         return self.status()

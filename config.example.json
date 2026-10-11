@@ -6,6 +6,8 @@
   "llama_server": "",
   "llama_runtime_root": "~/.local/share/local-ai-runtime/runtime/llama",
   "llama_runtime_manifest_url": "https://github.com/yanjing-chen/local-ai-runtime/releases/download/runtime-manifest/llama-runtimes.json",
+  "cuda_runtime_root": "~/.local/share/local-ai-runtime/runtime/cuda",
+  "cuda_runtime_manifest_url": "https://github.com/yanjing-chen/local-ai-runtime/releases/download/cuda-runtime-manifest/cuda-runtimes.json",
   "startup_timeout_seconds": 120,
   "idle_unload_seconds": 600,
   "models": [],

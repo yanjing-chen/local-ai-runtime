@@ -99,6 +99,10 @@
 - changing the preference does not interrupt the active model
 - single-model residency remains enforced
 
-## Stage 7
-- CUDA Runtime Manager integration
-- CUDA 12.8-r2 multi-architecture
+## Stage 7B — in development
+- Runtime-owned automatic / CUDA / Vulkan / CPU backend selection
+- independent versioned CUDA installation, SHA-256 verification and rollback
+- safe active-model unload when the backend preference changes
+- CUDA 12.8 multi-architecture candidate for sm75, sm86, sm89 and sm120
+- RTX 3050 (sm86) hardware validation before publishing the stable manifest
+- client packages remain free of CUDA and llama.cpp payloads

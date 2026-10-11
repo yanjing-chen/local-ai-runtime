@@ -29,11 +29,14 @@ assert status == 200
 assert runtime["current_model"] is None
 assert runtime["backend_running"] is False
 assert runtime["startup_preload"]["state"] == "disabled"
+assert runtime["backend_preference"] == "auto"
+assert runtime["active_backend"] is None
 
 status, preferences = get_json("/v1/runtime/preferences")
 assert status == 200
 assert preferences["preload_enabled"] is False
 assert preferences["preload_model"] == ""
+assert preferences["backend_preference"] == "auto"
 
 request = urllib.request.Request(
     base + "/v1/chat/completions",

@@ -1,0 +1,175 @@
+name: Build CUDA Runtime Candidate
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  LLAMA_CPP_REF: "828fdf282e195300c2965bd9511807e24ed53bdb"
+  CUDA_IMAGE: "nvidia/cuda:12.8.1-devel-ubuntu24.04"
+  CUDA_ARCHS: "75-real;86-real;89-real;120-real;120-virtual"
+  CUDA_RUNTIME_VERSION: "cuda-12.8-r3"
+
+jobs:
+  cuda-runtime:
+    name: CUDA 12.8 candidate / RTX 20-50
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install packaging dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends zstd
+
+      - name: Build self-contained CUDA backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUNTIME_DIR="$GITHUB_WORKSPACE/runtime-cuda-multiarch"
+          rm -rf "$RUNTIME_DIR"
+          mkdir -p "$RUNTIME_DIR"
+
+          docker run --rm -i \
+            -e LLAMA_CPP_REF="$LLAMA_CPP_REF" \
+            -e CUDA_ARCHS="$CUDA_ARCHS" \
+            -e CUDA_RUNTIME_VERSION="$CUDA_RUNTIME_VERSION" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            "$CUDA_IMAGE" \
+            bash -s <<'CUDA_BUILD_SCRIPT'
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            ca-certificates cmake build-essential git file binutils
+
+          WORK=/tmp/local-ai-runtime-llama-cuda
+          OUT=/workspace/runtime-cuda-multiarch
+          rm -rf "$WORK"
+          mkdir -p "$WORK" "$OUT/lib"
+
+          git clone --filter=blob:none \
+            https://github.com/ggml-org/llama.cpp.git \
+            "$WORK/llama.cpp"
+          git -C "$WORK/llama.cpp" checkout "$LLAMA_CPP_REF"
+
+          cmake \
+            -S "$WORK/llama.cpp" \
+            -B "$WORK/build-cuda" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGGML_NATIVE=OFF \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DLLAMA_CURL=OFF \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_EXAMPLES=OFF \
+            -DGGML_VULKAN=OFF \
+            -DGGML_CUDA=ON \
+            -DGGML_CUDA_NCCL=OFF \
+            -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCHS"
+          cmake --build "$WORK/build-cuda" --target llama-server -j"$(nproc)"
+
+          cp "$WORK/build-cuda/bin/llama-server" \
+            "$OUT/llama-server-cuda.bin"
+          chmod 0755 "$OUT/llama-server-cuda.bin"
+          strip --strip-unneeded "$OUT/llama-server-cuda.bin" || true
+
+          # Bundle CUDA user-space libraries only. libcuda.so.1 must always
+          # come from the NVIDIA driver installed on the target machine.
+          ldd "$OUT/llama-server-cuda.bin" \
+            | awk '$3 ~ "^/usr/local/cuda/" { print $3 }' \
+            | sort -u > /tmp/local-ai-runtime-cuda-libs.txt
+          while IFS= read -r lib; do
+            [[ -n "$lib" ]] || continue
+            cp -L "$lib" "$OUT/lib/"
+          done < /tmp/local-ai-runtime-cuda-libs.txt
+
+          cat > "$OUT/llama-server-cuda" <<'WRAPPER'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+          export LD_LIBRARY_PATH="$DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          exec "$DIR/llama-server-cuda.bin" "$@"
+          WRAPPER
+          sed -i 's/^          //' "$OUT/llama-server-cuda"
+          chmod 0755 "$OUT/llama-server-cuda"
+
+          nvcc --version > "$OUT/cuda-toolkit.txt"
+          {
+            echo "llama.cpp revision: $LLAMA_CPP_REF"
+            echo "CUDA image: nvidia/cuda:12.8.1-devel-ubuntu24.04"
+            echo "CUDA architectures: $CUDA_ARCHS"
+            echo "Host requirement: libcuda.so.1 from the NVIDIA driver"
+          } > "$OUT/build-info.txt"
+          LD_LIBRARY_PATH="$OUT/lib" ldd "$OUT/llama-server-cuda.bin" \
+            > "$OUT/ldd-build.txt" || true
+          file "$OUT/llama-server-cuda.bin" > "$OUT/file-info.txt"
+          chmod -R a+rX "$OUT"
+          CUDA_BUILD_SCRIPT
+
+          for required in \
+            llama-server-cuda \
+            llama-server-cuda.bin \
+            lib/libcudart.so.12 \
+            lib/libcublas.so.12 \
+            lib/libcublasLt.so.12; do
+            test -s "$RUNTIME_DIR/$required"
+          done
+
+          ARCHIVE="$GITHUB_WORKSPACE/Local-AI-Runtime-CUDA-${CUDA_RUNTIME_VERSION}-linux-x86_64.tar.zst"
+          tar --use-compress-program="zstd -19 -T0" \
+            -cf "$ARCHIVE" -C "$RUNTIME_DIR" .
+
+          python3 <<'METADATA'
+          from pathlib import Path
+          import hashlib
+          import json
+          import os
+
+          root = Path(os.environ["GITHUB_WORKSPACE"])
+          runtime = root / "runtime-cuda-multiarch"
+          version = os.environ["CUDA_RUNTIME_VERSION"]
+          archive = root / f"Local-AI-Runtime-CUDA-{version}-linux-x86_64.tar.zst"
+          required = [
+              "llama-server-cuda",
+              "llama-server-cuda.bin",
+              "lib/libcudart.so.12",
+              "lib/libcublas.so.12",
+              "lib/libcublasLt.so.12",
+          ]
+          payload = {
+              "version": version,
+              "llama_cpp_ref": os.environ["LLAMA_CPP_REF"],
+              "cuda_architectures": ["sm75", "sm86", "sm89", "sm120"],
+              "archive_name": archive.name,
+              "archive_size": archive.stat().st_size,
+              "archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+              "required_files": {
+                  name: (runtime / name).stat().st_size for name in required
+              },
+          }
+          (root / "cuda-runtime-candidate.json").write_text(
+              json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(payload, indent=2))
+          METADATA
+
+      - name: Upload CUDA candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: Local-AI-Runtime-CUDA-${{ env.CUDA_RUNTIME_VERSION }}-${{ github.sha }}
+          path: |
+            Local-AI-Runtime-CUDA-${{ env.CUDA_RUNTIME_VERSION }}-linux-x86_64.tar.zst
+            cuda-runtime-candidate.json
+          if-no-files-found: error
+          retention-days: 14

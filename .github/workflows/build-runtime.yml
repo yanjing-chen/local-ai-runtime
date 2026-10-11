@@ -166,3 +166,7 @@ jobs:
             Local-AI-Runtime-${{ env.RUNTIME_VERSION }}-linux-x86_64.tar.gz
             Local-AI-Runtime-${{ env.RUNTIME_VERSION }}-linux-x86_64.tar.gz.sha256sum
             runtime-metadata.json
+
+  cuda-candidate:
+    name: Stage 7B CUDA candidate
+    uses: ./.github/workflows/build-cuda-runtime.yml

@@ -16,6 +16,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from runtime_api import (
+    CudaRuntimeController,
     LlamaRuntimeController,
     RuntimeApiError,
 )
@@ -31,7 +32,7 @@ from preferences_api import (
 )
 
 
-VERSION = "0.7.0"
+VERSION = "0.8.0"
 
 
 def expand_path(value):
@@ -70,6 +71,20 @@ class RuntimeManager:
                     / "local-ai-runtime"
                     / "runtime"
                     / "llama"
+                ),
+            )
+        )
+
+        self.cuda_runtime_root = expand_path(
+            config.get(
+                "cuda_runtime_root",
+                str(
+                    Path.home()
+                    / ".local"
+                    / "share"
+                    / "local-ai-runtime"
+                    / "runtime"
+                    / "cuda"
                 ),
             )
         )
@@ -113,6 +128,10 @@ class RuntimeManager:
         self.preload_model = ""
         self.preload_state = "disabled"
         self.preload_error = None
+
+        self.backend_preference = "auto"
+        self.active_backend = None
+        self.backend_fallback = None
 
         self.idle_thread = threading.Thread(
             target=self._idle_worker,
@@ -169,6 +188,9 @@ class RuntimeManager:
             ),
             "idle_unload_seconds": self.idle_timeout,
             "startup_preload": self.preload_status(),
+            "backend_preference": self.backend_preference,
+            "active_backend": self.active_backend,
+            "backend_fallback": self.backend_fallback,
         }
 
     def preload_status(self):
@@ -194,6 +216,23 @@ class RuntimeManager:
             )
             self.preload_error = error
 
+    def configure_backend_preference(self, backend):
+        backend = str(backend or "auto").strip().lower()
+        if backend not in (
+            "auto",
+            "cuda",
+            "vulkan",
+            "cpu",
+        ):
+            raise RuntimeError(
+                "Invalid backend preference: "
+                f"{backend}"
+            )
+
+        with self.state_lock:
+            self.backend_preference = backend
+            self.backend_fallback = None
+
     def set_model_profile(
         self,
         model_id,
@@ -218,6 +257,7 @@ class RuntimeManager:
             process = self.process
             self.process = None
             self.current_model = None
+            self.active_backend = None
 
         if process is None:
             return
@@ -236,13 +276,7 @@ class RuntimeManager:
                     timeout=5
                 )
 
-    def _auto_runtime_server(self):
-        """Resolve the best installed llama-server at request time.
-
-        An explicit llama_server configuration always wins. Otherwise
-        Local AI Runtime prefers the managed Vulkan binary when it can
-        actually enumerate a Vulkan device, and falls back to CPU.
-        """
+    def _managed_backend_paths(self):
 
         runtime_bin = (
             Path(self.llama_runtime_root)
@@ -250,64 +284,142 @@ class RuntimeManager:
             / "bin"
         )
 
-        vulkan = (
-            runtime_bin
-            / "llama-server-vulkan"
+        cuda_root = (
+            Path(self.cuda_runtime_root)
+            / "current"
         )
 
-        cpu = (
-            runtime_bin
-            / "llama-server-cpu"
+        cuda_candidates = (
+            cuda_root / "llama-server-cuda",
+            cuda_root / "bin" / "llama-server-cuda",
+        )
+        cuda = next(
+            (
+                path
+                for path in cuda_candidates
+                if path.is_file()
+            ),
+            cuda_candidates[0],
         )
 
-        if (
-            vulkan.is_file()
-            and os.access(
-                vulkan,
-                os.X_OK,
+        return {
+            "cuda": cuda,
+            "vulkan": runtime_bin / "llama-server-vulkan",
+            "cpu": runtime_bin / "llama-server-cpu",
+        }
+
+    def _probe_backend(self, backend, path):
+        result = {
+            "backend": backend,
+            "path": str(path),
+            "installed": path.is_file(),
+            "usable": False,
+            "device": "",
+            "error": None,
+        }
+
+        if not path.is_file():
+            result["error"] = "Executable is not installed."
+            return result
+
+        if not os.access(path, os.X_OK):
+            result["error"] = "Executable is not executable."
+            return result
+
+        if backend == "cpu":
+            result["usable"] = True
+            result["device"] = "CPU"
+            return result
+
+        try:
+            probe = subprocess.run(
+                [str(path), "--list-devices"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=15,
+                check=False,
             )
-        ):
-            try:
-                result = subprocess.run(
-                    [
-                        str(vulkan),
-                        "--list-devices",
-                    ],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    timeout=15,
-                    check=False,
+            output = (probe.stdout or "").strip()
+            lowered = output.lower()
+            markers = (
+                ("cuda", "nvidia")
+                if backend == "cuda"
+                else ("vulkan",)
+            )
+            result["usable"] = (
+                probe.returncode == 0
+                and any(marker in lowered for marker in markers)
+            )
+            result["device"] = output[:2048]
+            if not result["usable"]:
+                result["error"] = (
+                    output[:2048]
+                    or f"{backend} device probe failed."
                 )
 
-                output = (
-                    result.stdout
-                    or ""
+        except Exception as exc:
+            result["error"] = str(exc)
+
+        return result
+
+    def backend_status(self):
+        paths = self._managed_backend_paths()
+        availability = {
+            backend: self._probe_backend(backend, path)
+            for backend, path in paths.items()
+        }
+
+        selected, effective, fallback = self._select_runtime_server(
+            availability=availability
+        )
+
+        return {
+            "preference": self.backend_preference,
+            "effective_backend": effective,
+            "active_backend": self.active_backend,
+            "fallback": fallback,
+            "executable": selected,
+            "availability": availability,
+        }
+
+    def _select_runtime_server(self, availability=None):
+        paths = self._managed_backend_paths()
+        availability = availability or {
+            backend: self._probe_backend(backend, path)
+            for backend, path in paths.items()
+        }
+
+        orders = {
+            "auto": ("cuda", "vulkan", "cpu"),
+            "cuda": ("cuda", "vulkan", "cpu"),
+            "vulkan": ("vulkan", "cpu"),
+            "cpu": ("cpu",),
+        }
+        order = orders[self.backend_preference]
+
+        for backend in order:
+            item = availability[backend]
+            if not item["usable"]:
+                continue
+
+            fallback = None
+            if self.backend_preference != "auto" and backend != order[0]:
+                requested = availability[order[0]]
+                fallback = (
+                    f"Requested {order[0]} backend is unavailable: "
+                    f"{requested['error']} Falling back to {backend}."
                 )
 
-                if (
-                    result.returncode == 0
-                    and "vulkan" in output.lower()
-                ):
-                    return str(
-                        vulkan
-                    )
+            return item["path"], backend, fallback
 
-            except Exception:
-                pass
+        return "", None, (
+            "No usable managed llama.cpp backend is installed."
+        )
 
-        if (
-            cpu.is_file()
-            and os.access(
-                cpu,
-                os.X_OK,
-            )
-        ):
-            return str(
-                cpu
-            )
-
-        return ""
+    def _auto_runtime_server(self):
+        runtime, _, _ = self._select_runtime_server()
+        return runtime
 
     def _model_command(self, model):
         runtime = expand_path(
@@ -320,13 +432,16 @@ class RuntimeManager:
         if not runtime:
             runtime = self.default_llama_server
 
+        backend = "custom"
+
         if not runtime:
-            runtime = self._auto_runtime_server()
+            runtime, backend, fallback = self._select_runtime_server()
+            self.backend_fallback = fallback
 
         if not runtime:
             raise RuntimeError(
                 "No llama-server executable is available. "
-                "Install the Local AI Runtime CPU/Vulkan runtime first."
+                "Install a Local AI Runtime CPU/Vulkan or CUDA runtime first."
             )
 
         runtime_path = Path(runtime)
@@ -399,7 +514,7 @@ class RuntimeManager:
             for x in extra_args
         ]
 
-        return command
+        return command, backend
 
     def ensure_model(self, model_id):
         if model_id not in self.models:
@@ -422,7 +537,7 @@ class RuntimeManager:
         self.stop_backend()
 
         model = self.models[model_id]
-        command = self._model_command(model)
+        command, backend = self._model_command(model)
 
         state_dir = (
             Path.home()
@@ -457,6 +572,7 @@ class RuntimeManager:
         with self.state_lock:
             self.process = process
             self.current_model = model_id
+            self.active_backend = backend
 
         deadline = (
             time.monotonic()
@@ -560,6 +676,13 @@ class ApiHandler(BaseHTTPRequestHandler):
         return (
             self.server
             .llama_runtime_controller
+        )
+
+    @property
+    def cuda_runtime(self):
+        return (
+            self.server
+            .cuda_runtime_controller
         )
 
     @property
@@ -692,6 +815,13 @@ class ApiHandler(BaseHTTPRequestHandler):
             )
             return
 
+        if path == "/v1/runtime/backends":
+            self.send_json(
+                200,
+                self.manager.backend_status(),
+            )
+            return
+
         if path == "/v1/runtime/llama/status":
             refresh = (
                 query.get(
@@ -708,6 +838,27 @@ class ApiHandler(BaseHTTPRequestHandler):
             self.send_json(
                 200,
                 self.llama_runtime.status(
+                    refresh=refresh
+                ),
+            )
+            return
+
+        if path == "/v1/runtime/cuda/status":
+            refresh = (
+                query.get(
+                    "refresh",
+                    ["0"],
+                )[0]
+                in (
+                    "1",
+                    "true",
+                    "yes",
+                )
+            )
+
+            self.send_json(
+                200,
+                self.cuda_runtime.status(
                     refresh=refresh
                 ),
             )
@@ -764,35 +915,66 @@ class ApiHandler(BaseHTTPRequestHandler):
                     allow_empty=False
                 )
 
-                if "preload_model" not in payload:
+                if not any(
+                    key in payload
+                    for key in (
+                        "preload_model",
+                        "backend_preference",
+                    )
+                ):
                     raise RuntimePreferenceError(
-                        "preload_model is required.",
+                        "preload_model or backend_preference is required.",
                         400,
                         "invalid_request_error",
                     )
 
-                model_id = payload["preload_model"]
+                backend_changed = False
 
-                if isinstance(model_id, str) and model_id.strip():
-                    self.model_controller.runtime_profile(
-                        model_id.strip()
+                if "preload_model" in payload:
+                    model_id = payload["preload_model"]
+
+                    if isinstance(model_id, str) and model_id.strip():
+                        self.model_controller.runtime_profile(
+                            model_id.strip()
+                        )
+
+                    result = self.preferences.set_preload_model(
+                        model_id
+                    )
+                    self.manager.configure_preload(
+                        result["preload_model"],
+                        "pending_restart"
+                        if result["preload_enabled"]
+                        else "disabled",
                     )
 
-                result = self.preferences.set_preload_model(
-                    model_id
-                )
-                self.manager.configure_preload(
-                    result["preload_model"],
-                    "pending_restart"
-                    if result["preload_enabled"]
-                    else "disabled",
-                )
+                if "backend_preference" in payload:
+                    old_backend = self.manager.backend_preference
+                    result = self.preferences.set_backend_preference(
+                        payload["backend_preference"]
+                    )
+                    new_backend = result["backend_preference"]
+                    backend_changed = new_backend != old_backend
+
+                    if backend_changed:
+                        with self.manager.request_lock:
+                            self.manager.stop_backend()
+
+                    self.manager.configure_backend_preference(
+                        new_backend
+                    )
+
+                result = self.preferences.status()
 
                 self.send_json(
                     200,
                     {
                         **result,
-                        "applies_on_next_start": True,
+                        "applies_on_next_start": (
+                            "preload_model" in payload
+                        ),
+                        "backend_changed": backend_changed,
+                        "backend_applies_on_next_request": backend_changed,
                         "startup_preload": self.manager.preload_status(),
                     },
                 )
@@ -1046,6 +1228,50 @@ class ApiHandler(BaseHTTPRequestHandler):
                     self.llama_runtime
                     .rollback()
                 )
+
+                self.send_json(
+                    200,
+                    result,
+                )
+                return
+
+            if (
+                path
+                == "/v1/runtime/cuda/install"
+            ):
+                payload, _ = (
+                    self.read_json_body(
+                        allow_empty=True
+                    )
+                )
+
+                operation = (
+                    self.cuda_runtime
+                    .start_install(
+                        payload.get("version")
+                    )
+                )
+
+                self.send_json(
+                    202,
+                    {
+                        "accepted": True,
+                        "operation": operation,
+                    },
+                )
+                return
+
+            if (
+                path
+                == "/v1/runtime/cuda/rollback"
+            ):
+                self.read_json_body(
+                    allow_empty=True
+                )
+
+                with self.manager.request_lock:
+                    self.manager.stop_backend()
+                    result = self.cuda_runtime.rollback()
 
                 self.send_json(
                     200,
@@ -1376,6 +1602,12 @@ def main():
         )
     )
 
+    cuda_runtime = (
+        CudaRuntimeController(
+            config
+        )
+    )
+
     model_controller = (
         ModelController(
             config
@@ -1390,6 +1622,9 @@ def main():
     manager.configure_preload(
         preference_status["preload_model"]
     )
+    manager.configure_backend_preference(
+        preference_status["backend_preference"]
+    )
 
     server = ThreadingHTTPServer(
         (
@@ -1402,6 +1637,9 @@ def main():
     server.runtime_manager = manager
     server.llama_runtime_controller = (
         llama_runtime
+    )
+    server.cuda_runtime_controller = (
+        cuda_runtime
     )
     server.model_controller = (
         model_controller

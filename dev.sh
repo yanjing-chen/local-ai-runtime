@@ -22,12 +22,19 @@ case "${1:-}" in
       "$ROOT/tests/custom_model_test.py" \
       "$ROOT/tests/gguf_inspector_test.py" \
       "$ROOT/tests/preload_preference_test.py" \
+      "$ROOT/tests/backend_preference_test.py" \
+      "$ROOT/tests/cuda_runtime_api_test.py" \
+      "$ROOT/tests/stage7b_contract.py" \
+      "$ROOT/tests/make_cuda_api_fixture.py" \
       "$ROOT/tests/streaming_proxy_test.py"
 
     echo "PYTHON SYNTAX        PASS"
 
     "$PY" \
       "$ROOT/tests/catalog_scope_test.py"
+
+    "$PY" \
+      "$ROOT/tests/stage7b_contract.py"
 
     TMP="$ROOT/.runtime-test"
 
@@ -40,6 +47,12 @@ case "${1:-}" in
         "$TMP/runtime-fixture"
     )"
 
+    CUDA_MANIFEST="$(
+      "$PY" \
+        "$ROOT/tests/make_cuda_api_fixture.py" \
+        "$TMP/cuda-fixture"
+    )"
+
     cat > "$TMP/config-stage0.json" <<JSON
 {
   "listen_host": "127.0.0.1",
@@ -49,6 +62,8 @@ case "${1:-}" in
   "llama_server": "",
   "llama_runtime_root": "$TMP/runtime-live",
   "llama_runtime_manifest_url": "$RUNTIME_MANIFEST",
+  "cuda_runtime_root": "$TMP/cuda-live",
+  "cuda_runtime_manifest_url": "$CUDA_MANIFEST",
   "model_root": "$TMP/models-empty",
   "custom_model_registry": "$TMP/custom-empty.json",
   "preferences_file": "$TMP/preferences-empty.json",
@@ -103,6 +118,10 @@ CHECK
       "$ROOT/tests/runtime_api_test.py" \
       "http://127.0.0.1:18111"
 
+    "$PY" \
+      "$ROOT/tests/cuda_runtime_api_test.py" \
+      "http://127.0.0.1:18111"
+
     cleanup_stage0
     trap - EXIT
 
@@ -111,6 +130,10 @@ CHECK
     PYTHONPATH="$ROOT/src" \
       "$PY" \
       "$ROOT/tests/runtime_manager_test.py"
+
+    PYTHONPATH="$ROOT/src" \
+      "$PY" \
+      "$ROOT/tests/backend_preference_test.py"
 
     echo "===== STAGE 3A MODEL SWITCH TEST ====="
 
@@ -305,6 +328,8 @@ CHECK
     echo "CUSTOM MODEL API      PASS"
     echo "GGUF INSPECTION API   PASS"
     echo "STARTUP PRELOAD       PASS"
+    echo "CUDA RUNTIME API      PASS"
+    echo "BACKEND SELECTION     PASS"
     echo "LOCAL AI RUNTIME STAGE 3A: PASS"
     ;;
 

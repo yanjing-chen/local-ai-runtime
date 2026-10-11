@@ -16,6 +16,11 @@ DEFAULT_MANIFEST_URL = (
     "releases/download/runtime-manifest/llama-runtimes.json"
 )
 
+DEFAULT_CUDA_MANIFEST_URL = (
+    "https://github.com/yanjing-chen/local-ai-runtime/"
+    "releases/download/cuda-runtime-manifest/cuda-runtimes.json"
+)
+
 
 class RuntimeApiError(RuntimeError):
     def __init__(
@@ -29,24 +34,27 @@ class RuntimeApiError(RuntimeError):
         self.error_type = error_type
 
 
-class LlamaRuntimeController:
-    def __init__(self, config):
+class ManagedRuntimeController:
+    def __init__(
+        self,
+        config,
+        root_key,
+        default_root,
+        manifest_key,
+        default_manifest_url,
+        operation_name,
+    ):
         root = config.get(
-            "llama_runtime_root",
-            str(
-                Path.home()
-                / ".local"
-                / "share"
-                / "local-ai-runtime"
-                / "runtime"
-                / "llama"
-            ),
+            root_key,
+            str(default_root),
         )
 
         self.manifest_url = config.get(
-            "llama_runtime_manifest_url",
-            DEFAULT_MANIFEST_URL,
+            manifest_key,
+            default_manifest_url,
         )
+
+        self.operation_name = operation_name
 
         self.manager = LlamaRuntimeManager(root)
 
@@ -151,7 +159,7 @@ class LlamaRuntimeController:
 
             self.operation = {
                 "state": "running",
-                "action": "install",
+                "action": self.operation_name,
                 "job_id": job_id,
                 "version": requested_version or "latest",
                 "phase": "checking_manifest",
@@ -163,7 +171,7 @@ class LlamaRuntimeController:
         thread = threading.Thread(
             target=self._install_worker,
             args=(job_id, requested_version),
-            name="llama-runtime-install",
+            name=f"{self.operation_name}-worker",
             daemon=True,
         )
         thread.start()
@@ -243,3 +251,37 @@ class LlamaRuntimeController:
         )
 
         return self.status(refresh=False)
+
+
+class LlamaRuntimeController(ManagedRuntimeController):
+    def __init__(self, config):
+        super().__init__(
+            config,
+            "llama_runtime_root",
+            Path.home()
+            / ".local"
+            / "share"
+            / "local-ai-runtime"
+            / "runtime"
+            / "llama",
+            "llama_runtime_manifest_url",
+            DEFAULT_MANIFEST_URL,
+            "install",
+        )
+
+
+class CudaRuntimeController(ManagedRuntimeController):
+    def __init__(self, config):
+        super().__init__(
+            config,
+            "cuda_runtime_root",
+            Path.home()
+            / ".local"
+            / "share"
+            / "local-ai-runtime"
+            / "runtime"
+            / "cuda",
+            "cuda_runtime_manifest_url",
+            DEFAULT_CUDA_MANIFEST_URL,
+            "install_cuda",
+        )
