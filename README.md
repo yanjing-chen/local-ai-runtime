@@ -33,6 +33,28 @@ When a request for another model arrives, Local AI Runtime will:
 
 An idle timeout can unload the active model automatically.
 
+## Runtime 1.0-A development: live idle-unload preference
+
+The API service keeps running when no model is loaded. Models are unloaded
+by the idle worker after a configurable interval since the last completed
+request. Existing `config.json` `idle_unload_seconds` values remain the
+fallback until the user explicitly changes their preference.
+
+    GET  /v1/runtime/preferences
+    POST /v1/runtime/preferences
+
+Example: `{"idle_unload_seconds":300}`. Allowed values are integers from 0
+(disable automatic unloading) to 86400 (24 hours). `600` is the default
+when neither the saved preference nor the launch config overrides it.
+Values are persisted in `preferences.json` with the existing atomic-write
+mechanism and apply without restarting the service; a changed timeout wakes
+the idle worker immediately. Active inference requests, including SSE streams,
+are protected by the request lock. This is a shared setting: any client
+editing it changes the timeout for every client of the same Runtime process.
+
+The development version is `1.0.0-dev`; this stage does not publish or install
+Runtime 1.0.0 or update the llama.cpp binaries.
+
 ## Optional startup preload
 
 Local AI Runtime 0.7 keeps the HTTP service available while leaving

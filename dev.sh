@@ -25,6 +25,7 @@ case "${1:-}" in
       "$ROOT/tests/backend_preference_test.py" \
       "$ROOT/tests/cuda_runtime_api_test.py" \
       "$ROOT/tests/stage7b_contract.py" \
+      "$ROOT/tests/idle_unload_test.py" \
       "$ROOT/tests/make_cuda_api_fixture.py" \
       "$ROOT/tests/streaming_proxy_test.py"
 
@@ -316,6 +317,11 @@ CHECK
     stop_preload_runtime
     trap - EXIT
 
+    echo "===== RUNTIME 1.0-A IDLE UNLOAD API ====="
+
+    PYTHONPATH="$ROOT/src" \
+      "$PY" "$ROOT/tests/idle_unload_test.py"
+
     echo "===== RESULT ====="
     echo "STAGE 0 API           PASS"
     echo "RUNTIME MANAGER       PASS"
@@ -330,7 +336,8 @@ CHECK
     echo "STARTUP PRELOAD       PASS"
     echo "CUDA RUNTIME API      PASS"
     echo "BACKEND SELECTION     PASS"
-    echo "LOCAL AI RUNTIME STAGE 3A: PASS"
+    echo "DYNAMIC IDLE UNLOAD   PASS"
+    echo "LOCAL AI RUNTIME 1.0-A DEVELOPMENT: PASS"
     ;;
 
   run)

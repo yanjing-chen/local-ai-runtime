@@ -22,7 +22,7 @@ CUDA_MANIFEST = json.loads(
     )
 )
 
-assert 'VERSION = "0.8.0"' in SERVICE
+assert 'VERSION = "1.0.0-dev"' in SERVICE
 assert '"backend_preference": "auto"' in PREFERENCES
 for backend in ("auto", "cuda", "vulkan", "cpu"):
     assert f'"{backend}"' in PREFERENCES

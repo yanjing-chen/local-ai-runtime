@@ -106,3 +106,16 @@
 - CUDA 12.8 multi-architecture candidate for sm75, sm86, sm89 and sm120
 - RTX 3050 (sm86) hardware validation before publishing the stable manifest
 - client packages remain free of CUDA and llama.cpp payloads
+
+## Runtime 1.0-A — dynamic idle model unloading (development)
+- [x] Persist `idle_unload_seconds` in preferences.json (fallback to config.json)
+- [x] POST/GET API with validation and immediate idle-worker wakeup
+- [x] `0` disables idle unloading, without stopping the API service
+- [x] Protect active requests and streaming inference from idle unloading
+- [ ] Validate on Ryzen 7 8845HS development machine before merging/release
+
+## Runtime 1.0-B through 1.0-E — planned
+- [ ] Pin and validate newer llama.cpp CPU/Vulkan and CUDA builds
+- [ ] Validate AMD and NVIDIA inference on real hardware
+- [ ] Publish app, CPU/Vulkan and CUDA artifacts in one 1.0.0 Release
+- [ ] Verify upgrade from 0.8.0 and rollback while retaining user models

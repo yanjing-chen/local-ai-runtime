@@ -32,7 +32,7 @@ from preferences_api import (
 )
 
 
-VERSION = "0.8.0"
+VERSION = "1.0.0-dev"
 
 
 def expand_path(value):
@@ -95,11 +95,8 @@ class RuntimeManager:
                 120,
             )
         )
-        self.idle_timeout = int(
-            config.get(
-                "idle_unload_seconds",
-                600,
-            )
+        self.idle_timeout = RuntimePreferences.validate_idle_timeout(
+            config.get("idle_unload_seconds", 600), stored=True,
         )
 
         self.models = {}
@@ -124,6 +121,7 @@ class RuntimeManager:
         self.state_lock = threading.RLock()
 
         self.stop_event = threading.Event()
+        self.idle_wakeup = threading.Event()
 
         self.preload_model = ""
         self.preload_state = "disabled"
@@ -166,6 +164,7 @@ class RuntimeManager:
             )
 
             current_model = self.current_model
+            idle_timeout = self.idle_timeout
 
             backend_pid = (
                 self.process.pid
@@ -186,7 +185,7 @@ class RuntimeManager:
                 if process_running
                 else False
             ),
-            "idle_unload_seconds": self.idle_timeout,
+            "idle_unload_seconds": idle_timeout,
             "startup_preload": self.preload_status(),
             "backend_preference": self.backend_preference,
             "active_backend": self.active_backend,
@@ -606,45 +605,54 @@ class RuntimeManager:
             f"{model_id}. See {log_path}"
         )
 
+    def configure_idle_timeout(self, seconds):
+        seconds = RuntimePreferences.validate_idle_timeout(seconds)
+        # Serialize configuration changes with all active requests and the
+        # idle worker. Changing the policy never unloads an active request.
+        with self.request_lock:
+            with self.state_lock:
+                self.idle_timeout = seconds
+        self.idle_wakeup.set()
+
     def _idle_worker(self):
-        while not self.stop_event.wait(5):
-            if self.idle_timeout <= 0:
-                continue
+        while not self.stop_event.is_set():
+            # Wake immediately when the idle setting is changed; otherwise
+            # poll every five seconds as in 0.8.0.
+            self.idle_wakeup.wait(5)
+            self.idle_wakeup.clear()
+            if self.stop_event.is_set():
+                return
 
             with self.state_lock:
-                model_loaded = (
-                    self.current_model
-                    is not None
-                )
+                timeout = self.idle_timeout
+                model_loaded = self.current_model is not None
+                last_used = self.last_used
 
-            if not model_loaded:
+            if (not model_loaded or timeout == 0
+                    or time.monotonic() - last_used < timeout):
                 continue
 
-            if (
-                time.monotonic()
-                - self.last_used
-                < self.idle_timeout
-            ):
+            if not self.request_lock.acquire(blocking=False):
                 continue
-
-            if self.request_lock.acquire(
-                blocking=False
-            ):
-                try:
-                    if (
-                        self.current_model
-                        is not None
-                        and time.monotonic()
-                        - self.last_used
-                        >= self.idle_timeout
-                    ):
-                        self.stop_backend()
-
-                finally:
-                    self.request_lock.release()
+            try:
+                # Recheck the *current* policy under the request lock: an
+                # inference or preferences write might have happened since
+                # the initial observation.
+                with self.state_lock:
+                    timeout = self.idle_timeout
+                    should_unload = (
+                        self.current_model is not None
+                        and timeout > 0
+                        and time.monotonic() - self.last_used >= timeout
+                    )
+                if should_unload:
+                    self.stop_backend()
+            finally:
+                self.request_lock.release()
 
     def shutdown(self):
         self.stop_event.set()
+        self.idle_wakeup.set()
 
         with self.request_lock:
             self.stop_backend()
@@ -920,10 +928,12 @@ class ApiHandler(BaseHTTPRequestHandler):
                     for key in (
                         "preload_model",
                         "backend_preference",
+                        "idle_unload_seconds",
                     )
                 ):
                     raise RuntimePreferenceError(
-                        "preload_model or backend_preference is required.",
+                        "preload_model, backend_preference or "
+                        "idle_unload_seconds is required.",
                         400,
                         "invalid_request_error",
                     )
@@ -962,6 +972,14 @@ class ApiHandler(BaseHTTPRequestHandler):
 
                     self.manager.configure_backend_preference(
                         new_backend
+                    )
+
+                if "idle_unload_seconds" in payload:
+                    result = self.preferences.set_idle_unload_seconds(
+                        payload["idle_unload_seconds"]
+                    )
+                    self.manager.configure_idle_timeout(
+                        result["idle_unload_seconds"]
                     )
 
                 result = self.preferences.status()
@@ -1624,6 +1642,9 @@ def main():
     )
     manager.configure_backend_preference(
         preference_status["backend_preference"]
+    )
+    manager.configure_idle_timeout(
+        preference_status["idle_unload_seconds"]
     )
 
     server = ThreadingHTTPServer(

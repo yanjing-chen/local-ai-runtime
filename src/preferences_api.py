@@ -41,6 +41,26 @@ class RuntimePreferences:
             )
         )
         self.lock = threading.RLock()
+        # Keep the existing launch configuration as the default for users
+        # who have not explicitly set a persistent idle preference.
+        self.default_idle_unload_seconds = self.validate_idle_timeout(
+            config.get("idle_unload_seconds", 600),
+            stored=True,
+        )
+
+    @staticmethod
+    def validate_idle_timeout(value, stored=False):
+        # bool is a subclass of int; accepting True/False would make a
+        # settings UI mistake silently turn into a one-second timeout.
+        if type(value) is not int or not 0 <= value <= 86400:
+            raise RuntimePreferenceError(
+                "idle_unload_seconds must be an integer from 0 to 86400 "
+                "(0 disables automatic unloading).",
+                500 if stored else 400,
+                "runtime_preference_store_error" if stored
+                else "invalid_request_error",
+            )
+        return value
 
     @staticmethod
     def _empty():
@@ -114,6 +134,10 @@ class RuntimePreferences:
             )
 
         data["backend_preference"] = backend_preference
+        if "idle_unload_seconds" in data:
+            data["idle_unload_seconds"] = self.validate_idle_timeout(
+                data["idle_unload_seconds"], stored=True,
+            )
         return data
 
     def _write_unlocked(self, data):
@@ -168,6 +192,9 @@ class RuntimePreferences:
             "preload_enabled": bool(model_id),
             "preload_model": model_id,
             "backend_preference": data["backend_preference"],
+            "idle_unload_seconds": data.get(
+                "idle_unload_seconds", self.default_idle_unload_seconds
+            ),
         }
 
     def set_preload_model(self, model_id):
@@ -220,4 +247,12 @@ class RuntimePreferences:
             data["backend_preference"] = backend
             self._write_unlocked(data)
 
+        return self.status()
+
+    def set_idle_unload_seconds(self, seconds):
+        seconds = self.validate_idle_timeout(seconds)
+        with self.lock:
+            data = self._load_unlocked()
+            data["idle_unload_seconds"] = seconds
+            self._write_unlocked(data)
         return self.status()
