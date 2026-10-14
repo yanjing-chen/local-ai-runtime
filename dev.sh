@@ -26,6 +26,7 @@ case "${1:-}" in
       "$ROOT/tests/cuda_runtime_api_test.py" \
       "$ROOT/tests/stage7b_contract.py" \
       "$ROOT/tests/idle_unload_test.py" \
+      "$ROOT/tests/cpu_vulkan_candidate_contract_test.py" \
       "$ROOT/tests/make_cuda_api_fixture.py" \
       "$ROOT/tests/streaming_proxy_test.py"
 
@@ -36,6 +37,9 @@ case "${1:-}" in
 
     "$PY" \
       "$ROOT/tests/stage7b_contract.py"
+
+    "$PY" \
+      "$ROOT/tests/cpu_vulkan_candidate_contract_test.py"
 
     TMP="$ROOT/.runtime-test"
 

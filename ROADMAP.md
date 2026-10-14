@@ -119,3 +119,12 @@
 - [ ] Validate AMD and NVIDIA inference on real hardware
 - [ ] Publish app, CPU/Vulkan and CUDA artifacts in one 1.0.0 Release
 - [ ] Verify upgrade from 0.8.0 and rollback while retaining user models
+
+## Runtime 1.0-B4 — CPU/Vulkan candidate preparation (in progress)
+- Ryzen 7 8845HS: llama.cpp v0.6.0 (`d812350`) CPU and Vulkan compiled.
+- Real PaddleOCR-VL 1.6 simple-image smoke test: 3/3 rounds per backend PASS.
+- Old b11103 direct comparison was skipped (legacy executables absent).
+- Isolated Ubuntu 24.04 candidate workflow added; explicit branch push is
+  required to trigger CI; awaiting approval and CI execution.
+- Stable published llama manifest remains unchanged pending verified artifact.
+- CUDA workflow remains independent and unchanged until Stage 1.0-C.

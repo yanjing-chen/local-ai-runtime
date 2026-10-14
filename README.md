@@ -196,3 +196,21 @@ Run:
     ./dev.sh test
 
 The development smoke test uses port 18111 so it does not conflict with the current Flameshot OCR service on port 8111.
+
+## Runtime 1.0-B4 CPU/Vulkan candidate (development only)
+
+The isolated workflow `.github/workflows/build-cpu-vulkan-v1-candidate.yml`
+builds pinned llama.cpp `d81235049384534c167caea52b85a694f6103d14`
+(`v0.6.0`) on Ubuntu 24.04. It never triggers CUDA builds or creates
+a GitHub Release. Existing `build-runtime.yml`, `build-cuda-runtime.yml`,
+and the published `packaging/runtime/llama-runtimes.json` are preserved.
+
+The tested candidate version is `llama-d8123504-r1`. Once the Ubuntu 24.04
+archive and `runtime-metadata.json` are retrieved from the CI artifact,
+`packaging/runtime/stage_llama_candidate.py` can validate both files
+and generate a *separate* manifest with the old versions retained. The
+script does not publish, install, or overwrite the current manifest.
+
+8845HS testing: 3 repeated PaddleOCR-VL 1.6 runs passed for CPU and Vulkan
+(Radeon 780M). Old b11103 direct comparison, long-document OCR and HY-MT2
+translation remain unverified; do not describe this candidate as released.

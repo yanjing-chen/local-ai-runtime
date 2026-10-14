@@ -1,0 +1,170 @@
+name: Runtime 1.0 CPU/Vulkan candidate (isolated)
+
+# Isolated v1 candidate workflow. Runs on manual dispatch or an explicit
+# push of the v1.0-stage1b development branch; never releases or calls CUDA.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v1.0-stage1b-cpu-vulkan-ci
+    paths:
+      - ".github/workflows/build-cpu-vulkan-v1-candidate.yml"
+
+permissions:
+  contents: read
+
+env:
+  LLAMA_CPP_REF: "d81235049384534c167caea52b85a694f6103d14"
+  LLAMA_CPP_TAG: "v0.6.0"
+  RUNTIME_VERSION: "llama-d8123504-r1"
+
+jobs:
+  candidate:
+    name: Ubuntu 24.04 CPU/Vulkan candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout Local AI Runtime
+        uses: actions/checkout@v4
+
+      - name: Install CPU/Vulkan build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build git ca-certificates \
+            libvulkan-dev glslc spirv-headers
+
+      - name: Fetch exact llama.cpp commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git llama.cpp
+          git -C llama.cpp checkout --detach "$LLAMA_CPP_REF"
+          test "$(git -C llama.cpp rev-parse HEAD)" = "$LLAMA_CPP_REF"
+          echo "UPSTREAM_COMMIT_VERIFIED=$LLAMA_CPP_REF"
+
+      - name: Build CPU
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S llama.cpp -B build-cpu -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGGML_NATIVE=OFF \
+            -DGGML_VULKAN=OFF \
+            -DLLAMA_CURL=OFF \
+            -DLLAMA_OPENSSL=OFF \
+            -DLLAMA_BUILD_UI=OFF \
+            -DLLAMA_USE_PREBUILT_UI=OFF \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DLLAMA_BUILD_SERVER=ON \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_EXAMPLES=OFF
+          cmake --build build-cpu --target llama-server -j 3 2>&1 | tee build-cpu.log
+          if grep -q 'UI: downloading' build-cpu.log; then
+            echo 'Unexpected unpinned llama.cpp Web UI download' >&2
+            exit 1
+          fi
+
+      - name: Build Vulkan
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S llama.cpp -B build-vulkan -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGGML_NATIVE=OFF \
+            -DGGML_VULKAN=ON \
+            -DLLAMA_CURL=OFF \
+            -DLLAMA_OPENSSL=OFF \
+            -DLLAMA_BUILD_UI=OFF \
+            -DLLAMA_USE_PREBUILT_UI=OFF \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DLLAMA_BUILD_SERVER=ON \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_EXAMPLES=OFF
+          cmake --build build-vulkan --target llama-server -j 3 2>&1 | tee build-vulkan.log
+          if grep -q 'UI: downloading' build-vulkan.log; then
+            echo 'Unexpected unpinned llama.cpp Web UI download' >&2
+            exit 1
+          fi
+
+      - name: Verify CLI and linked dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          for backend in cpu vulkan; do
+            binary="build-${backend}/bin/llama-server"
+            test -x "$binary"
+            "$binary" --version
+            "$binary" --help > "${backend}-help.txt" 2>&1
+            for option in '--mmproj' '--jinja' '--spec-type' 'draft-dflash'; do
+              grep -Fq -- "$option" "${backend}-help.txt"
+            done
+            ldd "$binary" > "${backend}-ldd.txt"
+            if grep -q 'not found' "${backend}-ldd.txt"; then
+              cat "${backend}-ldd.txt"
+              exit 1
+            fi
+            if grep -E 'lib(llama|ggml|mtmd).*\.so' "${backend}-ldd.txt"; then
+              echo 'Backend must not require unbundled dynamic llama/ggml/mtmd libs' >&2
+              exit 1
+            fi
+          done
+          echo 'CLI_AND_LINKAGE=PASS'
+
+      - name: Package candidate (not a release)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p package/bin
+          install -m 0755 build-cpu/bin/llama-server package/bin/llama-server-cpu
+          install -m 0755 build-vulkan/bin/llama-server package/bin/llama-server-vulkan
+          archive="Local-AI-Runtime-${RUNTIME_VERSION}-linux-x86_64.tar.gz"
+          tar -C package -czf "$archive" .
+          ARCHIVE_NAME="$archive" python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          version = os.environ['RUNTIME_VERSION']
+          ref = os.environ['LLAMA_CPP_REF']
+          archive = Path(os.environ['ARCHIVE_NAME'])
+          required = [
+              'bin/llama-server-cpu',
+              'bin/llama-server-vulkan',
+          ]
+          sizes = {p: (Path('package') / p).stat().st_size for p in required}
+          metadata = {
+              'schema_version': 1,
+              'version': version,
+              'platform': 'linux-x86_64',
+              'backend': 'llama.cpp',
+              'llama_cpp_ref': ref,
+              'archive': {
+                  'name': archive.name,
+                  'size': archive.stat().st_size,
+                  'sha256': hashlib.sha256(archive.read_bytes()).hexdigest(),
+                  'installed_size': sum(sizes.values()),
+              },
+              'required_files': [{'path': p, 'size': sizes[p]} for p in required],
+          }
+          Path('runtime-metadata.json').write_text(json.dumps(metadata, indent=2)+'\n', encoding='utf-8')
+          print(json.dumps(metadata, indent=2))
+          PY
+          sha256sum "$archive" > "$archive.sha256sum"
+          echo 'CPU_VULKAN_CANDIDATE_PACKAGE=PASS'
+
+      - name: Upload isolated candidate artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Local-AI-Runtime-${{ env.RUNTIME_VERSION }}-ubuntu2404-candidate
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            Local-AI-Runtime-${{ env.RUNTIME_VERSION }}-linux-x86_64.tar.gz
+            Local-AI-Runtime-${{ env.RUNTIME_VERSION }}-linux-x86_64.tar.gz.sha256sum
+            runtime-metadata.json
+            cpu-ldd.txt
+            vulkan-ldd.txt
+            build-cpu.log
+            build-vulkan.log
