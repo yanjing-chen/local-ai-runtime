@@ -41,6 +41,9 @@ case "${1:-}" in
     "$PY" \
       "$ROOT/tests/cpu_vulkan_candidate_contract_test.py"
 
+    "$PY" \
+      "$ROOT/tests/cuda_v1_candidate_contract_test.py"
+
     TMP="$ROOT/.runtime-test"
 
     rm -rf "$TMP"

@@ -1,0 +1,189 @@
+name: Runtime 1.0 CUDA candidate (isolated)
+
+# Trigger ONLY by a CUDA candidate branch update or manually after workflow
+# has landed on the repository's default branch. Never publishes a release.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v1.0-stage1c-cuda-ci
+    paths:
+      - ".github/workflows/build-cuda-v1-candidate.yml"
+
+permissions:
+  contents: read
+
+env:
+  LLAMA_CPP_REF: "d81235049384534c167caea52b85a694f6103d14"
+  CUDA_IMAGE: "nvidia/cuda:12.8.1-devel-ubuntu24.04"
+  CUDA_ARCHS: "75-real;86-real;89-real;120-real;120-virtual"
+  CUDA_RUNTIME_VERSION: "cuda-d8123504-r1"
+
+jobs:
+  cuda-candidate:
+    name: Ubuntu 24.04 CUDA 12.8 / RTX 20-50
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install zstd (for package only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends zstd
+
+      - name: Build and package isolated pinned CUDA candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/cuda-candidate-files"
+          docker run --rm -i \
+            -e LLAMA_CPP_REF="$LLAMA_CPP_REF" \
+            -e CUDA_ARCHS="$CUDA_ARCHS" \
+            -e CUDA_RUNTIME_VERSION="$CUDA_RUNTIME_VERSION" \
+            -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
+            "$CUDA_IMAGE" bash -s <<'CUDA_BUILD'
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            ca-certificates cmake build-essential git file binutils
+          WORK=/tmp/runtime-v1-cuda-build
+          OUT=/workspace/cuda-candidate-files
+          mkdir -p "$WORK" "$OUT/runtime/lib"
+
+          git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git "$WORK/llama.cpp"
+          git -C "$WORK/llama.cpp" checkout --detach "$LLAMA_CPP_REF"
+          test "$(git -C "$WORK/llama.cpp" rev-parse HEAD)" = "$LLAMA_CPP_REF"
+          echo "CUDA_UPSTREAM_VERIFIED=$LLAMA_CPP_REF"
+
+          cmake -S "$WORK/llama.cpp" -B "$WORK/build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGGML_NATIVE=OFF \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DLLAMA_CURL=OFF \
+            -DLLAMA_OPENSSL=OFF \
+            -DLLAMA_BUILD_UI=OFF \
+            -DLLAMA_USE_PREBUILT_UI=OFF \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_EXAMPLES=OFF \
+            -DGGML_VULKAN=OFF \
+            -DGGML_CUDA=ON \
+            -DGGML_CUDA_NCCL=OFF \
+            -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCHS" \
+            2>&1 | tee "$OUT/configure-cuda.log"
+
+          cmake --build "$WORK/build" --target llama-server -j 3 \
+            2>&1 | tee "$OUT/build-cuda.log"
+          if grep -q 'UI: downloading' "$OUT/build-cuda.log"; then
+            echo 'ERROR: unexpected unpinned Web UI download' >&2
+            exit 1
+          fi
+
+          cp "$WORK/build/bin/llama-server" "$OUT/runtime/llama-server-cuda.bin"
+          chmod 0755 "$OUT/runtime/llama-server-cuda.bin"
+          strip --strip-unneeded "$OUT/runtime/llama-server-cuda.bin" || true
+
+          # Bundle userspace CUDA libraries. Never bundle libcuda.so.1 (kernel-driver API).
+          ldd "$OUT/runtime/llama-server-cuda.bin" > "$OUT/ldd-before-bundle.txt" || true
+          awk '$3 ~ "^/usr/local/cuda/" {print $3}' "$OUT/ldd-before-bundle.txt" \
+            | sort -u > "$OUT/cuda-libs.txt"
+          while IFS= read -r lib; do
+            test -n "$lib" || continue
+            cp -L "$lib" "$OUT/runtime/lib/"
+          done < "$OUT/cuda-libs.txt"
+          cat > "$OUT/runtime/llama-server-cuda" <<'WRAPPER'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+          export LD_LIBRARY_PATH="$DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          exec "$DIR/llama-server-cuda.bin" "$@"
+          WRAPPER
+          sed -i 's/^          //' "$OUT/runtime/llama-server-cuda"
+          chmod 0755 "$OUT/runtime/llama-server-cuda"
+          nvcc --version > "$OUT/cuda-toolkit.txt"
+          file "$OUT/runtime/llama-server-cuda.bin" > "$OUT/file-info.txt"
+          LD_LIBRARY_PATH="$OUT/runtime/lib" ldd "$OUT/runtime/llama-server-cuda.bin" \
+            > "$OUT/ldd-after-bundle.txt" || true
+
+          for file in \
+            llama-server-cuda \
+            llama-server-cuda.bin \
+            lib/libcudart.so.12 \
+            lib/libcublas.so.12 \
+            lib/libcublasLt.so.12; do
+            test -s "$OUT/runtime/$file" || { echo "MISSING=$file" >&2; exit 1; }
+          done
+          # Check command-line compatibility without running a model or requiring NVIDIA GPU.
+          # Some CUDA builds enumerate GPU on --version; that check belongs on test hardware.
+          chmod -R a+rX "$OUT/runtime"
+          CUDA_BUILD
+
+          VERSION="$CUDA_RUNTIME_VERSION"
+          ARCHIVE="Local-AI-Runtime-CUDA-${VERSION}-linux-x86_64.tar.zst"
+          tar --use-compress-program='zstd -12 -T0' \
+            -cf "$ARCHIVE" -C cuda-candidate-files/runtime .
+          python3 - "$ARCHIVE" <<'METADATA'
+          import hashlib, json, os, pathlib, sys
+          filename = pathlib.Path(sys.argv[1]); root=pathlib.Path('cuda-candidate-files/runtime')
+          files = ['llama-server-cuda','llama-server-cuda.bin','lib/libcudart.so.12',
+                   'lib/libcublas.so.12','lib/libcublasLt.so.12']
+          sizes={name:(root/name).stat().st_size for name in files}
+          digest=hashlib.sha256()
+          with filename.open('rb') as stream:
+              for chunk in iter(lambda:stream.read(1048576),b''):
+                  digest.update(chunk)
+          meta={
+              'schema_version':1,
+              'version':os.environ['CUDA_RUNTIME_VERSION'],
+              'platform':'linux-x86_64',
+              'backend':'cuda',
+              'llama_cpp_ref':os.environ['LLAMA_CPP_REF'],
+              'cuda_toolkit':'12.8.1',
+              'cuda_architectures':['sm75','sm86','sm89','sm120'],
+              'archive':{
+                  'name':filename.name, 'size':filename.stat().st_size,
+                  'sha256':digest.hexdigest(),
+                  'installed_size':sum(sizes.values())
+              },
+              'required_files':[{'path':name,'size':sizes[name]} for name in files]
+          }
+          pathlib.Path('cuda-runtime-candidate.json').write_text(
+              json.dumps(meta,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(meta,indent=2))
+          METADATA
+          sha256sum "$ARCHIVE" > "$ARCHIVE.sha256sum"
+          echo 'CUDA_CANDIDATE_PACKAGE=PASS'
+
+      - name: Upload CI candidate (not GitHub Release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Local-AI-Runtime-${{ env.CUDA_RUNTIME_VERSION }}-ubuntu2404-candidate
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            Local-AI-Runtime-CUDA-${{ env.CUDA_RUNTIME_VERSION }}-linux-x86_64.tar.zst
+            Local-AI-Runtime-CUDA-${{ env.CUDA_RUNTIME_VERSION }}-linux-x86_64.tar.zst.sha256sum
+            cuda-runtime-candidate.json
+            cuda-candidate-files/configure-cuda.log
+            cuda-candidate-files/build-cuda.log
+            cuda-candidate-files/cuda-toolkit.txt
+            cuda-candidate-files/file-info.txt
+            cuda-candidate-files/ldd-before-bundle.txt
+            cuda-candidate-files/ldd-after-bundle.txt
+
+      - name: Upload build logs on failure (fast diagnosis)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Local-AI-Runtime-CUDA-v1-failure-${{ github.run_id }}
+          retention-days: 7
+          if-no-files-found: ignore
+          path: |
+            cuda-candidate-files/configure-cuda.log
+            cuda-candidate-files/build-cuda.log
+            cuda-candidate-files/ldd-before-bundle.txt
+            cuda-candidate-files/ldd-after-bundle.txt
