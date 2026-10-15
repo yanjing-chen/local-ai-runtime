@@ -215,11 +215,10 @@ script does not publish, install, or overwrite the current manifest.
 (Radeon 780M). Old b11103 direct comparison, long-document OCR and HY-MT2
 translation remain unverified; do not describe this candidate as released.
 
-## 1.0.0-rc1 staging (unpublished)
+## Local AI Runtime 1.0.0
 
-This local release candidate includes dynamic idle unload preferences, a validated
-CPU/Vulkan candidate and an independently validated CUDA candidate. Model files
-and inference backends remain separately installable and rollback-capable.
-The stage1d candidate is **not** an upgrade of an installed Runtime. The
-published 0.8.0 application and legacy CPU/Vulkan/CUDA manifest entries remain
-unchanged until the release and migration tests are complete.
+This release supports selectable CPU, Vulkan and CUDA inference backends,
+startup preload preferences, and live, persistent idle model unloading.
+Backend binaries are separate, versioned packages with rollback support.
+Installing/updating the Runtime application does not replace model files or
+GPU backends. Before upgrade, back up configuration and preferences.

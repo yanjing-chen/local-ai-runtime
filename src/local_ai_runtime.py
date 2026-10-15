@@ -32,7 +32,7 @@ from preferences_api import (
 )
 
 
-VERSION = "1.0.0-rc1"
+VERSION = "1.0.0"
 
 
 def expand_path(value):
