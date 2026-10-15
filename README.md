@@ -214,3 +214,12 @@ script does not publish, install, or overwrite the current manifest.
 8845HS testing: 3 repeated PaddleOCR-VL 1.6 runs passed for CPU and Vulkan
 (Radeon 780M). Old b11103 direct comparison, long-document OCR and HY-MT2
 translation remain unverified; do not describe this candidate as released.
+
+## 1.0.0-rc1 staging (unpublished)
+
+This local release candidate includes dynamic idle unload preferences, a validated
+CPU/Vulkan candidate and an independently validated CUDA candidate. Model files
+and inference backends remain separately installable and rollback-capable.
+The stage1d candidate is **not** an upgrade of an installed Runtime. The
+published 0.8.0 application and legacy CPU/Vulkan/CUDA manifest entries remain
+unchanged until the release and migration tests are complete.
